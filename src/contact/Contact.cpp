@@ -29,19 +29,7 @@ Contact::~Contact()
 
 void Contact::computeContactFrame()
 {
-    // Compute the contact frame, which consists of an orthonormal
-    //  bases formed the vector n, t1, and t2
-    // 
-    //  The first bases direction is given by the normal, n.
-    //  Use it to compute the other two directions.
-
-    // TODO Compute first tangent direction t1
-    //
-
-
-    // TODO Compute second tangent direction t2.
-    //
-    /*Eigen::Vector3f dir = Eigen::Vector3f(1,0,0);
+    Eigen::Vector3f dir = Eigen::Vector3f(1,0,0);
     t1 = dir - (dir.dot(n))*n;
     if( t1.norm() < 1e-5f )
     {
@@ -50,12 +38,10 @@ void Contact::computeContactFrame()
     }
     t1.normalize();
 
-    // Compute second tangent direction.
-    //
     t2 = n.cross(t1);
-    t2.normalize();*/
+    t2.normalize();
 
-    Eigen::Vector3f tangent1 = Eigen::Vector3f::Zero();
+    /*Eigen::Vector3f tangent1 = Eigen::Vector3f::Zero();
     Eigen::Vector3f tangent2 = Eigen::Vector3f::Zero();
     Eigen::Vector3f n = this->n;
 
@@ -69,13 +55,11 @@ void Contact::computeContactFrame()
     tangent2.normalize();
 
     this->t1 = tangent1;
-    this->t2 = tangent2;
+    this->t2 = tangent2;*/
 }
 
 void Contact::computeJacobian()
 {
-    // TODO Compute the Jacobians J0 and J1 
-    // for body0 and body1, respectively.
     const Eigen::Vector3f r0 = p - body0->x;
     const Eigen::Vector3f r1 = p - body1->x;
 
@@ -103,11 +87,6 @@ void Contact::computeJacobian()
     J1.block(2, 0, 1, 3) = -t2.transpose();
     J1.block(2, 3, 1, 3) = -r1.cross(t2).transpose();
 
-    // Compute the J M^-1 blocks for each body. The code is provided.
-    // 
-    // However, together with the contact Jacobians J0 and J1, these will
-    //   be used by the solver to assemble the blocked LCP matrices.
-    //
     J0Minv.block(0,0,3,3) = (1.0f/body0->mass) * J0.block(0, 0, 3, 3);
     J0Minv.block(0,3,3,3) = J0.block(0, 3, 3, 3) * body0->Iinv;
     J1Minv.block(0,0,3,3) = (1.0f/body1->mass) * J1.block(0, 0, 3, 3);

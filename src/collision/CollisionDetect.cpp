@@ -108,13 +108,6 @@ void CollisionDetect::collisionDetectSphereSphere(RigidBody* body0, RigidBody* b
 
 void CollisionDetect::collisionDetectSphereBox(RigidBody* body0, RigidBody* body1)
 {
-    // TODO Implement sphere-box collision detection.
-    //      The function should check if a collision exists.
-    // 
-    //      If it does, compute the contact normal, contact point, and penetration depth and
-    //      create a Contact and add it to m_contacts.
-    //
-
     Sphere* sphere = dynamic_cast<Sphere*>(body0->geometry.get());
     Box* box = dynamic_cast<Box*>(body1->geometry.get());
 

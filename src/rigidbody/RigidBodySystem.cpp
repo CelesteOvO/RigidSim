@@ -95,12 +95,9 @@ void RigidBodySystem::step(float dt)
     // Compute constraint forces.
     // The LCP solver will be called here.
     //
-    /// 1
+
     calcConstraintForces(dt);
 
-    // TODO Perform numerical integration to first update the velocities of each rigid body in @a m_bodies, 
-    //      followed by the positions and orientations.
-    //
     for(RigidBody* b : m_bodies)
     {
         if( !b->fixed )

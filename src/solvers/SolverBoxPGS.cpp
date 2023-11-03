@@ -56,11 +56,9 @@ namespace
     static inline void solveContact(const Eigen::Matrix3f& A, const Eigen::VectorXf& b, Eigen::VectorXf& x, const float mu)
     {
         // Normal impulse is projected to [0, inf]
-        //
         x(0) = std::max(0.0f, (b(0) - A(0,1) * x(1) - A(0,2) * x(2) ) / A(0,0) );
 
         // Next, friction impulses are projected to [-mu * x(0), mu * x(1)]
-        //
         x(1) = std::max(-mu*x(0), std::min(mu*x(0), ( b(1) - A(1,0) * x(0) - A(1,2) * x(2) ) / A(1,1) ));
         x(2) = std::max(-mu*x(0), std::min(mu*x(0), ( b(2) - A(2,0) * x(0) - A(2,1) * x(1) ) / A(2,2) ));
     }
@@ -73,28 +71,19 @@ SolverBoxPGS::SolverBoxPGS(RigidBodySystem* _rigidBodySystem) : Solver(_rigidBod
 
 void SolverBoxPGS::solve(float h)
 {
-    // TODO Implement a PGS method that solves for the
-    //      contact constraint forces in @a rigidBodySystem. 
-    //      Assume a boxed LCP formulation.
-    //
+
     std::vector<Contact*>& contacts = m_rigidBodySystem->getContacts();
     const int numContacts = contacts.size();
 
-    // Build array of 3x3 diagonal matrices, one for each contact.
-    // 
     std::vector<Eigen::Matrix3f> Acontactii;
     if( numContacts > 0 )
     {
-
-        // TODO Compute the right-hand side vector : b = -gamma*phi/h - J*vel - dt*JMinvJT*force
         Acontactii.resize(numContacts);
         for(int i = 0; i < numContacts; ++i)
         {
             Contact* c = contacts[i];
             const float eps = 1.0f / (h * h * c->k + h * c->b);    // constraint force mixing
 
-            // Compute the diagonal term : Aii = J0*Minv0*J0^T + J1*Minv1*J1^T
-            //
             Acontactii[i].setZero(3,3);
             Acontactii[i](0,0) += eps;
 
@@ -119,44 +108,12 @@ void SolverBoxPGS::solve(float h)
         }
 
         // PGS main loop.
-        // There is no convergence test here. Simply stop after @a maxIter iterations.
-        //
         for(int iter = 0; iter < m_maxIter; ++iter)
         {
-            // TODO For each contact, compute an updated value of contacts[i]->lambda
-            //      using matrix-free pseudo-code provided in the course appendix.
-            //
             for(int i = 0; i < numContacts; ++i)
             {
-                // TODO initialize current solution as x = b(i)
-                // 
-
-                // TODO Loop over all other contacts involving c->body0
-                //      and accumulate : x -= (J0*Minv0*Jother^T) * lambda_other
-                //
-
-
-                // TODO Loop over all other contacts involving c->body1
-                //      and accumulate : x -= (J0*Minv0*Jother^T) * lambda_other
-                //
-
-
-                // TODO Compute the diagonal term : Aii = J0*Minv0*J0^T + J1*Minv1*J1^T
-                //
-
-
-                // TODO Update lambda by solving the sub-problem : Aii * contacts[i].lambda = x
-                //      For non-interpenetration constraints, lambda is non-negative and should be clamped
-                //      to the range (0... infinity).
-                //      Otherwise friction constraints should be clamped to the range (-mu*lambda_n, mu*lambda_n)
-                //      where lambda_n is the impulse of the corresponding non-interpentration constraint.
-                //
-
                 Contact* c = contacts[i];
-
-                // Initialize current solution as x = b[i]
                 Eigen::VectorXf x = b[i];
-
                 accumulateCoupledContacts(c, c->J0Minv, c->body0, x);
                 accumulateCoupledContacts(c, c->J1Minv, c->body1, x);
                 solveContact(Acontactii[i], x, c->lambda, c->mu);
