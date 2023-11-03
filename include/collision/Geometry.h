@@ -114,7 +114,7 @@ public:
     virtual eGeometryType getType() const override { return kSDF; }
 };
 
-void SDFGeometry::computeInertia() {
+/*void SDFGeometry::computeInertia() {
     if( mesh )
     {
         Eigen::Matrix3f A;
@@ -182,4 +182,4 @@ SDFGeometry::SDFGeometry(const std::string &filename, const std::array<unsigned 
     sdf->addFunction(func, true);
 
     computeInertia();
-}
+}*/
