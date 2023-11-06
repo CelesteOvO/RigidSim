@@ -4,7 +4,7 @@
 #include "rigidbody/RigidBody.h"
 #include "rigidbody/RigidBodySystem.h"
 
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 namespace
 {

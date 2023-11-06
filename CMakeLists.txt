@@ -35,7 +35,8 @@ set(discregrid_HEADERS 3rdParty/Discregrid/include/Discregrid/acceleration/bound
 
 set(collision_HEADERS include/collision/CollisionDetect.h 
                       include/collision/Geometry.h )
-set(collision_SOURCE include/collision/CollisionDetect.cpp)
+set(collision_SOURCE include/collision/CollisionDetect.cpp
+		include/collision/Geometry.cpp)
 
 set(rigidbody_HEADERS include/rigidbody/RigidBody.h
                       include/rigidbody/RigidBodySystem.h 
@@ -48,7 +49,7 @@ set(contact_SOURCE include/contact/Contact.cpp)
 
 set(solver_HEADERS include/solvers/Solver.h 
                    include/solvers/SolverBoxPGS.h )
-set(solver_SOURCE src/solvers/SolverBoxPGS.cpp )
+set(solver_SOURCE include/solvers/SolverBoxPGS.cpp)
 
 set(util_HEADERS include/util/OBJLoader.h
                  include/util/MeshAssets.h )
@@ -58,7 +59,7 @@ set(util_SOURCE include/util/OBJLoader.cpp
 set(viewer_HEADERS include/viewer/SimViewer.h)
 set(viewer_SOURCE include/viewer/SimViewer.cpp)
         
-add_executable (rigidBodyTutorial main.cpp
+add_executable (rigidBodyTutorial tutorials/main.cpp
           ${contact_HEADERS} ${contact_SOURCE} 
           ${collision_HEADERS} ${collision_SOURCE}
           ${rigidbody_HEADERS} ${rigidbody_SOURCE}
@@ -73,7 +74,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include 3rdParty/Eigen3/include/
 
 # Setup source code groups
 #
-source_group(src FILES main.cpp MainWindow.cpp)
+source_group(src FILES tutorials/main.cpp MainWindow.cpp)
 source_group(include FILES MainWindow.h)
 source_group(ui FILES main.ui)
 source_group(3rdParty/discregrid/src FILES ${discregrid_SOURCE})
