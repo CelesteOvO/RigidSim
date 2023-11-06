@@ -49,8 +49,10 @@ set(contact_HEADERS include/contact/Contact.h )
 set(contact_SOURCE include/contact/Contact.cpp)
 
 set(solver_HEADERS include/solvers/Solver.h 
-                   include/solvers/SolverBoxPGS.h )
-set(solver_SOURCE include/solvers/SolverBoxPGS.cpp)
+                   include/solvers/SolverBoxPGS.h
+		include/solvers/solverBoxBPP.h)
+set(solver_SOURCE include/solvers/SolverBoxPGS.cpp
+		include/solvers/solverBoxBPP.cpp)
 
 set(util_HEADERS include/util/OBJLoader.h
                  include/util/MeshAssets.h )

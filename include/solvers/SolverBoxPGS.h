@@ -10,10 +10,10 @@ class SolverBoxPGS : public Solver
 {
 public:
 
-    SolverBoxPGS(RigidBodySystem* _rigidBodySystem);
+    explicit SolverBoxPGS(RigidBodySystem* _rigidBodySystem);
 
     // Implement PGS method that solves for the constraint forces in @a m_rigidBodySystem.
     //
-    virtual void solve(float h);
+    void solve(float h) override;
 
 };

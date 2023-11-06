@@ -135,6 +135,9 @@ void SimViewer::drawGUI()
     if (ImGui::Button("Sphere on Plane")) {
         createSphereOnPlane();
     }
+    if (ImGui::Button("Box Stack On Plane")) {
+        createBoxStackOnPlane();
+    }
 }
 
 void SimViewer::draw()
@@ -189,6 +192,12 @@ void SimViewer::createBoxBallStack() {
 
 void SimViewer::createSphereOnPlane() {
     Scenarios::createSphereOnPlane(*m_rigidBodySystem);
+    updateRigidBodyMeshes(*m_rigidBodySystem);
+    polyscope::view::resetCameraToHomeView();
+}
+
+void SimViewer::createBoxStackOnPlane() {
+    Scenarios::createBoxStackOnPlane(*m_rigidBodySystem);
     updateRigidBodyMeshes(*m_rigidBodySystem);
     polyscope::view::resetCameraToHomeView();
 }

@@ -18,7 +18,7 @@ public:
 
     // Constructor.
     //
-    CollisionDetect(RigidBodySystem* rigidBodySystem);
+    explicit CollisionDetect(RigidBodySystem* rigidBodySystem);
 
     // Tests for collisions between all pairs of bodies in the rigid body system
     // and generates contacts for any intersecting geometries.
@@ -49,6 +49,14 @@ private:
     void collisionDetectBoxPlane(RigidBody* body0, RigidBody* body1);
 
     void collisionDetectSpherePlane(RigidBody* body0, RigidBody* body1);
+
+    void collisionDetectBoxBox(RigidBody* body0, RigidBody* body1);
+
+    /// further
+    float penetrationOnAxis(RigidBody *pBody, RigidBody *pBody1, const Eigen::Vector3f& matrix);
+    static float transformToAxis(RigidBody *pBody, const Eigen::Vector3f& axis);
+    void collisionDetectFaceVertex(RigidBody* body0, RigidBody* body1, Eigen::Vector3f axis, float penetration);
+    void collisionDetectEdgeEdge(RigidBody* body0, RigidBody* body1, Eigen::Vector3f axis, float penetration, int oneAxisIndex, int twoAxisIndex);
 
 private:
 

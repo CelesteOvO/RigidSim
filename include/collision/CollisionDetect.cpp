@@ -97,6 +97,18 @@ void CollisionDetect::detectCollisions()
             {
                 collisionDetectSpherePlane(body1, body0);
             }
+            // Test for box-box collision
+            else if( body0->geometry->getType() == kBox &&
+                     body1->geometry->getType() == kBox )
+            {
+                collisionDetectBoxBox(body0, body1);
+            }
+            // Test for box-box collision (order swap)
+            else if( body1->geometry->getType() == kBox &&
+                     body0->geometry->getType() == kBox )
+            {
+                collisionDetectBoxBox(body1, body0);
+            }
         }
     }
 }
@@ -229,4 +241,141 @@ void CollisionDetect::collisionDetectSpherePlane(RigidBody *body0, RigidBody *bo
 
         m_contacts.push_back( new Contact(body0, body1, p, n, phi) );
     }
+}
+
+///TODO: 有问题
+void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) {
+    std::vector<Eigen::Vector3f> axis;
+
+    for (int i = 0; i < 3; i++) {
+        axis.emplace_back(body0->q.toRotationMatrix().col(i));
+        axis.emplace_back(body1->q.toRotationMatrix().matrix().col(i));
+    }
+
+    for(int i = 0; i < 3; i++)
+    {
+        for(int j = 0; j < 3; j++)
+        {
+            Eigen::Vector3f temp = axis[i].cross(axis[3+j]);
+            if(temp.norm() > 1e-6f)
+                axis.emplace_back(temp.normalized());
+        }
+    }
+
+    float minOverlap = 1e10f;
+    unsigned int bestAxis = 15;
+    for (unsigned int i = 0; i < 15; i++)
+    {
+        Eigen::Vector3f temp = axis[i];
+        if(temp.norm() < 1e-6f)
+            continue;
+        temp.normalize();
+        float overlap = penetrationOnAxis(body0, body1, temp);
+        if(overlap < 0)
+            return;
+        if(overlap < minOverlap)
+        {
+            minOverlap = overlap;
+            bestAxis = i;
+        }
+    }
+
+    if(bestAxis <= 2)
+    {
+        collisionDetectFaceVertex(body0, body1, axis[bestAxis], minOverlap);
+    }else if(bestAxis <= 5)
+    {
+        collisionDetectFaceVertex(body1, body0, axis[bestAxis], minOverlap);
+    }else{
+        int oneAxisIndex = (bestAxis - 6) / 3;
+        int twoAxisIndex = bestAxis % 3;
+        collisionDetectEdgeEdge(body0, body1, axis[bestAxis], minOverlap, oneAxisIndex, twoAxisIndex);
+    }
+}
+
+float CollisionDetect::penetrationOnAxis(RigidBody *pBody, RigidBody *pBody1, const Eigen::Vector3f& axis) {
+    float one = transformToAxis(pBody, axis);
+    float two = transformToAxis(pBody1, axis);
+    float center = abs((pBody->x - pBody1->x).dot(axis));
+    return one + two - center;
+}
+
+float CollisionDetect::transformToAxis(RigidBody *pBody, const Eigen::Vector3f &axis) {
+    Box* box0 = dynamic_cast<Box*>(pBody->geometry.get());
+    float projectionMax = -1e10f;
+    float projectionMin = 1e10f;
+    for (float cx = -1.0f * box0->dim(0) / 2;cx < box0->dim(0);cx += box0->dim(0))
+    {
+        for (float cy = -1.0f * box0->dim(1) / 2;cy < box0->dim(1);cy += box0->dim(1))
+        {
+            for (float cz = -1.0f * box0->dim(2) / 2;cz < box0->dim(2);cz += box0->dim(2))
+            {
+                Eigen::Vector3f vertex = Eigen::Vector3f(cx,cy,cz);
+                float projection = vertex.dot(axis);
+                projectionMax = std::max(projectionMax,projection);
+                projectionMin = std::min(projectionMin,projection);
+            }
+        }
+    }
+    return (projectionMax - projectionMin) / 2.0f;
+}
+
+void CollisionDetect::collisionDetectFaceVertex(RigidBody *body0, RigidBody *body1, Eigen::Vector3f axis,
+                                                float penetration) {
+    Eigen::Vector3f toCenter = body1->x - body0->x;
+    if(axis.dot(toCenter) > 0)
+        axis *= -1;
+    Box* box1 = dynamic_cast<Box*>(body1->geometry.get());
+    Eigen::Vector3f vertex = body1->x + box1->dim(0) * body1->q.toRotationMatrix().col(0) + box1->dim(1) * body1->q.toRotationMatrix().col(1) + box1->dim(2) * body1->q.toRotationMatrix().col(2);
+    if(body1->q.toRotationMatrix().col(0).dot(axis) < 0)
+        vertex -= body1->q.toRotationMatrix().col(0);
+    if(body1->q.toRotationMatrix().col(1).dot(axis) < 0)
+        vertex -= body1->q.toRotationMatrix().col(1);
+    if(body1->q.toRotationMatrix().col(2).dot(axis) < 0)
+        vertex -= body1->q.toRotationMatrix().col(2);
+
+    m_contacts.push_back(new Contact(body0, body1, vertex, axis, penetration));
+}
+
+void
+CollisionDetect::collisionDetectEdgeEdge(RigidBody *body0, RigidBody *body1, Eigen::Vector3f axis, float penetration, int oneAxisIndex, int twoAxisIndex) {
+    Eigen::Vector3f toCenter = body1->x - body0->x;
+    if(axis.dot(toCenter) > 0)
+        axis *= -1;
+    Eigen::Vector3f ptOnEdgeOne = body0->x;
+    Eigen::Vector3f ptOnEdgeTwo = body1->x;
+    Box* box0 = dynamic_cast<Box*>(body0->geometry.get());
+    Box* box1 = dynamic_cast<Box*>(body1->geometry.get());
+    for(int i = 0; i < 3; i++)
+    {
+        if(i == oneAxisIndex){}
+        else if(body0->q.toRotationMatrix().col(i).dot(axis) > 0)
+            ptOnEdgeOne -= box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
+        else
+            ptOnEdgeOne += box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
+        if(i == twoAxisIndex){}
+        else if(body1->q.toRotationMatrix().col(i).dot(axis) < 0)
+            ptOnEdgeTwo -= box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
+        else
+            ptOnEdgeTwo += box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
+    }
+    Eigen::Vector3f axisOne = body0->q.toRotationMatrix().col(oneAxisIndex);
+    Eigen::Vector3f axisTwo = body1->q.toRotationMatrix().col(twoAxisIndex);
+    Eigen::Vector3f toSt = ptOnEdgeOne - ptOnEdgeTwo;
+
+    float dpStaOne = axisOne.dot(toSt);
+    float dpStaTwo = axisTwo.dot(toSt);
+
+    float smOne = axisOne.squaredNorm();
+    float smTwo = axisTwo.squaredNorm();
+
+    double dotProductEdges = axisTwo.dot(axisOne);
+    double denom = smOne * smTwo - dotProductEdges * dotProductEdges;
+    double ta = (dotProductEdges * dpStaTwo - smTwo * dpStaOne) / denom;
+    double tb = (smOne * dpStaTwo - dotProductEdges * dpStaOne) / denom;
+
+    Eigen::Vector3f ptOne = ptOnEdgeOne + ta * axisOne;
+    Eigen::Vector3f ptTwo = ptOnEdgeTwo + tb * axisTwo;
+
+    m_contacts.push_back(new Contact(body0, body1, 0.5f * (ptOne + ptTwo), axis, penetration));
 }

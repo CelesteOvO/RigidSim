@@ -43,6 +43,7 @@ private:
     void createBoxOnPlane();
     void createSphereOnPlane();
     void createBoxBallStack();
+    void createBoxStackOnPlane();
 
     void draw();
     void drawGUI();

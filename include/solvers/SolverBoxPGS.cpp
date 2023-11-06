@@ -71,7 +71,6 @@ SolverBoxPGS::SolverBoxPGS(RigidBodySystem* _rigidBodySystem) : Solver(_rigidBod
 
 void SolverBoxPGS::solve(float h)
 {
-
     std::vector<Contact*>& contacts = m_rigidBodySystem->getContacts();
     const int numContacts = contacts.size();
 
