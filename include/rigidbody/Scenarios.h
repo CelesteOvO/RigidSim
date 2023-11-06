@@ -95,4 +95,75 @@ public:
         bodyBox->mesh->setSurfaceColor({ 0.2f, 0.2f, 0.2f })->setSmoothShade(false)->setTransparency(0.4f);
     }
 
+    // Box on a plane
+    //
+    static void createBoxOnPlane(RigidBodySystem& rigidBodySystem)
+    {
+        rigidBodySystem.clear();
+        polyscope::removeAllStructures();
+
+        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
+        body0->fixed = true;
+
+        RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
+        body1->x = Eigen::Vector3f(0.0f, 0.49f, 0.0f);
+
+        RigidBody* body2 = new RigidBody(10.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
+        body2->x = Eigen::Vector3f(2.0f, 0.49f, 0.0f);
+        body2->xdot = Eigen::Vector3f(0.0f, 0.0f, 10.0f);
+
+        rigidBodySystem.addBody(body0);
+        rigidBodySystem.addBody(body1);
+        rigidBodySystem.addBody(body2);
+    }
+
+    // Stack of boxes and spheres.
+    //
+    static void createBoxBallStack(RigidBodySystem& rigidBodySystem)
+    {
+        rigidBodySystem.clear();
+        polyscope::removeAllStructures();
+
+        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
+        body0->fixed = true;
+
+        RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
+        body1->x = Eigen::Vector3f(0.0f, 0.5f, 0.0f);
+        RigidBody* body2 = new RigidBody(1.0f, new Sphere(0.5f), "D:\\project\\RigidSim\\resources\\sphere.obj");
+        body2->x = Eigen::Vector3f(0.0f, 1.5f, 0.0f);
+        RigidBody* body3 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
+        body3->x = Eigen::Vector3f(0.0f, 2.5f, 0.0f);
+        RigidBody* body4 = new RigidBody(1.0f, new Sphere(0.5f), "D:\\project\\RigidSim\\resources\\sphere.obj");
+        body4->x = Eigen::Vector3f(0.0f, 3.5f, 0.0f);
+
+        rigidBodySystem.addBody(body0);
+        rigidBodySystem.addBody(body1);
+        rigidBodySystem.addBody(body2);
+        rigidBodySystem.addBody(body3);
+        rigidBodySystem.addBody(body4);
+    }
+
+    // bunny on a plane
+    /// TODO
+    static void createBunnies(RigidBodySystem& rigidBodySystem)
+    {
+        rigidBodySystem.clear();
+        polyscope::removeAllStructures();
+
+        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
+        body0->fixed = true;
+
+        RigidBody* body1 = new RigidBody(1.0f, new SDFGeometry("D:\\project\\RigidSim\\resources\\bunny.obj", {10, 10, 10}), "D:\\project\\RigidSim\\resources\\bunny.obj");
+        RigidBody* body2 = new RigidBody(1.0f, new SDFGeometry("D:\\project\\RigidSim\\resources\\bunny.obj", {10, 10, 10}), "D:\\project\\RigidSim\\resources\\bunny.obj");
+        RigidBody* body3 = new RigidBody(1.0f, new SDFGeometry("D:\\project\\RigidSim\\resources\\bunny.obj", {10, 10, 10}), "D:\\project\\RigidSim\\resources\\bunny.obj");
+
+        body1->x = Eigen::Vector3f(0.5f, 2.0f, -0.5f);
+        body2->x = Eigen::Vector3f(0.5f, 4.0f, 0.5);
+        body3->x = Eigen::Vector3f(-0.5f, 6.0f, 0.5f);
+
+        rigidBodySystem.addBody(body0);
+        rigidBodySystem.addBody(body1);
+        rigidBodySystem.addBody(body2);
+        rigidBodySystem.addBody(body3);
+    }
 };

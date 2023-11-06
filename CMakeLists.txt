@@ -42,7 +42,8 @@ set(rigidbody_HEADERS include/rigidbody/RigidBody.h
                       include/rigidbody/RigidBodySystem.h 
                       include/rigidbody/Scenarios.h )
 set(rigidbody_SOURCE include/rigidbody/RigidBody.cpp
-		include/rigidbody/RigidBodySystem.cpp)
+		include/rigidbody/RigidBodySystem.cpp
+)
 
 set(contact_HEADERS include/contact/Contact.h )
 set(contact_SOURCE include/contact/Contact.cpp)

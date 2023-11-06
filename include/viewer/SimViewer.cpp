@@ -126,6 +126,12 @@ void SimViewer::drawGUI()
     if (ImGui::Button("Marble box")) {
         createMarbleBox();
     }
+    if (ImGui::Button("Box on Plane")) {
+        createBoxOnPlane();
+    }
+    if (ImGui::Button("Box Ball Stack")) {
+        createBoxBallStack();
+    }
 }
 
 void SimViewer::draw()
@@ -166,7 +172,21 @@ void SimViewer::createSphereOnBox()
     polyscope::view::resetCameraToHomeView();
 }
 
+void SimViewer::createBoxOnPlane() {
+    Scenarios::createBoxOnPlane(*m_rigidBodySystem);
+    updateRigidBodyMeshes(*m_rigidBodySystem);
+    polyscope::view::resetCameraToHomeView();
+}
+
+void SimViewer::createBoxBallStack() {
+    Scenarios::createBoxBallStack(*m_rigidBodySystem);
+    updateRigidBodyMeshes(*m_rigidBodySystem);
+    polyscope::view::resetCameraToHomeView();
+}
+
 void SimViewer::preStep(std::vector<RigidBody*>& _bodies)
 {
 
 }
+
+
