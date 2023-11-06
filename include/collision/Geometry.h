@@ -75,9 +75,10 @@ class Plane : public Geometry
 {
 public:
     Eigen::Vector3f normal;         // The plane normal.
+    Eigen::Vector3f dim;        // Box dimensions.
 
-    explicit Plane(Eigen::Vector3f  _normal)
-            : normal(std::move(_normal)) {}
+    explicit Plane(Eigen::Vector3f  _normal, Eigen::Vector3f  _dim)
+            : normal(std::move(_normal)), dim(std::move(_dim)) {}
     ~Plane() override = default;
 
     Eigen::Matrix3f computeInertia(float _mass) override

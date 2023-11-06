@@ -4,6 +4,31 @@
 #include "rigidbody/RigidBody.h"
 #include "rigidbody/RigidBodySystem.h"
 
+namespace
+{
+    // Plane-point collision test.
+    //
+    // Inputs:
+    //   p - The point to test.
+    //   plane_p - The plane origin.
+    //   plane_n  - Direction perpendicular to the plane (the normal).
+    // Outputs:
+    //   phi - The penetration depth.
+    // Returns:
+    //   True if the point intersects the plane.
+    //
+    inline bool collisionDetectPointPlane(const Eigen::Vector3f& p, const Eigen::Vector3f& plane_p, const Eigen::Vector3f& plane_n, float& phi)
+    {
+        const float dp = (p - plane_p).dot(plane_n);
+        if (dp < 0.0f)
+        {
+            phi = std::min(0.0f, dp);
+            return true;
+        }
+        return false;
+    }
+}
+
 CollisionDetect::CollisionDetect(RigidBodySystem* rigidBodySystem) : m_rigidBodySystem(rigidBodySystem)
 {
 
@@ -48,6 +73,30 @@ void CollisionDetect::detectCollisions()
             {
                 collisionDetectSphereBox(body1, body0);
             }
+            // Test for plane-box collision
+            else if( body1->geometry->getType() == kPlane &&
+                     body0->geometry->getType() == kBox )
+            {
+                collisionDetectBoxPlane(body0, body1);
+            }
+            // Test for plane-box collision (order swap)
+            else if ( body0->geometry->getType() == kPlane &&
+                      body1->geometry->getType() == kBox )
+            {
+                collisionDetectBoxPlane(body1, body0);
+            }
+            // Test for plane-sphere collision
+            else if( body1->geometry->getType() == kPlane &&
+                     body0->geometry->getType() == kSphere )
+            {
+                collisionDetectSpherePlane(body0, body1);
+            }
+            // Test for plane-sphere collision (order swap)
+            else if ( body0->geometry->getType() == kPlane &&
+                      body1->geometry->getType() == kSphere )
+            {
+                collisionDetectSpherePlane(body1, body0);
+            }
         }
     }
 }
@@ -85,8 +134,8 @@ void CollisionDetect::clear()
 
 void CollisionDetect::collisionDetectSphereSphere(RigidBody* body0, RigidBody* body1)
 {
-    Sphere* sphere0 = dynamic_cast<Sphere*>(body0->geometry.get());
-    Sphere* sphere1 = dynamic_cast<Sphere*>(body1->geometry.get());
+    auto* sphere0 = dynamic_cast<Sphere*>(body0->geometry.get());
+    auto* sphere1 = dynamic_cast<Sphere*>(body1->geometry.get());
 
     // Implement sphere-sphere collision detection.
     // The function should check if a collision exists, and if it does
@@ -108,7 +157,7 @@ void CollisionDetect::collisionDetectSphereSphere(RigidBody* body0, RigidBody* b
 
 void CollisionDetect::collisionDetectSphereBox(RigidBody* body0, RigidBody* body1)
 {
-    Sphere* sphere = dynamic_cast<Sphere*>(body0->geometry.get());
+    auto* sphere = dynamic_cast<Sphere*>(body0->geometry.get());
     Box* box = dynamic_cast<Box*>(body1->geometry.get());
 
     Eigen::Vector3f clocal = body1->q.toRotationMatrix().transpose() * (body0->x - body1->x);
@@ -117,6 +166,57 @@ void CollisionDetect::collisionDetectSphereBox(RigidBody* body0, RigidBody* body
     for(unsigned int i = 0; i < 3; ++i)
     {
         q[i] = std::max(-box->dim[i]/2.0f, std::min(box->dim[i]/2.0f, clocal[i]));
+    }
+
+    const Eigen::Vector3f dx = clocal - q;
+    const float dist = dx.norm();
+    if( dist < sphere->radius )
+    {
+        const Eigen::Vector3f n = body1->q.toRotationMatrix() * (dx/dist);
+        const Eigen::Vector3f p = body1->q.toRotationMatrix() * q + body1->x;
+        const float phi = dist - sphere->radius;
+
+        m_contacts.push_back( new Contact(body0, body1, p, n, phi) );
+    }
+}
+
+void CollisionDetect::collisionDetectBoxPlane(RigidBody *body0, RigidBody *body1) {
+    Box* box = dynamic_cast<Box*>(body0->geometry.get());
+    auto* plane = dynamic_cast<Plane*>(body1->geometry.get());
+    const Eigen::Vector3f pplane = body1->x;
+    const Eigen::Vector3f nplane = body1->q.toRotationMatrix() * plane->normal;
+    const Eigen::Vector3f plocal[8] = {
+            0.5f*Eigen::Vector3f(-box->dim(0), -box->dim(1), -box->dim(2)),
+            0.5f*Eigen::Vector3f(-box->dim(0), -box->dim(1),  box->dim(2)),
+            0.5f*Eigen::Vector3f(-box->dim(0),  box->dim(1), -box->dim(2)),
+            0.5f*Eigen::Vector3f(-box->dim(0),  box->dim(1),  box->dim(2)),
+            0.5f*Eigen::Vector3f( box->dim(0), -box->dim(1), -box->dim(2)),
+            0.5f*Eigen::Vector3f( box->dim(0), -box->dim(1),  box->dim(2)),
+            0.5f*Eigen::Vector3f( box->dim(0),  box->dim(1), -box->dim(2)),
+            0.5f*Eigen::Vector3f( box->dim(0),  box->dim(1),  box->dim(2))
+    };
+
+    for (const auto & i : plocal)
+    {
+        const Eigen::Vector3f pbox = body0->q.toRotationMatrix() * i + body0->x;
+        float phi;
+        if  ( collisionDetectPointPlane(pbox, pplane, nplane, phi) )
+        {
+            m_contacts.push_back( new Contact(body0, body1, pbox, nplane, phi) );
+        }
+    }
+}
+
+void CollisionDetect::collisionDetectSpherePlane(RigidBody *body0, RigidBody *body1) {
+    auto* sphere = dynamic_cast<Sphere*>(body0->geometry.get());
+    auto* plane = dynamic_cast<Plane*>(body1->geometry.get());
+
+    Eigen::Vector3f clocal = body1->q.toRotationMatrix().transpose() * (body0->x - body1->x);
+
+    Eigen::Vector3f q(0,0,0);
+    for(unsigned int i = 0; i < 3; ++i)
+    {
+        q[i] = std::max(-plane->dim[i]/2.0f, std::min(plane->dim[i]/2.0f, clocal[i]));
     }
 
     const Eigen::Vector3f dx = clocal - q;

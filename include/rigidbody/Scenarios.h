@@ -102,7 +102,7 @@ public:
         rigidBodySystem.clear();
         polyscope::removeAllStructures();
 
-        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
+        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f),Eigen::Vector3f(8.0f, 0.0f, 8.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
         body0->fixed = true;
 
         RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
@@ -117,6 +117,26 @@ public:
         rigidBodySystem.addBody(body2);
     }
 
+    // Sphere on a plane
+    //
+    static void createSphereOnPlane(RigidBodySystem& rigidBodySystem)
+    {
+        rigidBodySystem.clear();
+        polyscope::removeAllStructures();
+
+        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f),Eigen::Vector3f(8.0f, 0.0f, 8.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
+        body0->fixed = true;
+
+        RigidBody* body1 = new RigidBody(1.0f, new Sphere(0.5f), "D:\\project\\rigidBodyTutorial\\resources\\sphere.obj");
+        body1->x.y() = 2.0f;
+        body1->omega = Eigen::Vector3f(5.0f, 0.0f, 0.0f);
+        body1->mesh->setTransparency(0.8f);
+        body1->mesh->setSurfaceColor({ 0.1f, 1.0f, 0.2f })->setEdgeWidth(1.0f);
+
+        rigidBodySystem.addBody(body0);
+        rigidBodySystem.addBody(body1);
+    }
+
     // Stack of boxes and spheres.
     //
     static void createBoxBallStack(RigidBodySystem& rigidBodySystem)
@@ -124,7 +144,7 @@ public:
         rigidBodySystem.clear();
         polyscope::removeAllStructures();
 
-        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
+        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f),Eigen::Vector3f(8.0f, 0.0f, 8.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
         body0->fixed = true;
 
         RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
@@ -150,7 +170,7 @@ public:
         rigidBodySystem.clear();
         polyscope::removeAllStructures();
 
-        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
+        RigidBody* body0 = new RigidBody(1.0f, new Plane(Eigen::Vector3f(0.0f, 1.0f, 0.0f),Eigen::Vector3f(8.0f, 0.0f, 8.0f)), "D:\\project\\RigidSim\\resources\\plane.obj");
         body0->fixed = true;
 
         RigidBody* body1 = new RigidBody(1.0f, new SDFGeometry("D:\\project\\RigidSim\\resources\\bunny.obj", {10, 10, 10}), "D:\\project\\RigidSim\\resources\\bunny.obj");

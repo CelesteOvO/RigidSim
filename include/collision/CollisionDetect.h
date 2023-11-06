@@ -46,6 +46,10 @@ private:
     //
     void collisionDetectSphereBox(RigidBody* body0, RigidBody* body1);
 
+    void collisionDetectBoxPlane(RigidBody* body0, RigidBody* body1);
+
+    void collisionDetectSpherePlane(RigidBody* body0, RigidBody* body1);
+
 private:
 
     RigidBodySystem* m_rigidBodySystem;     // Rigid body system where collision detection is performed.
