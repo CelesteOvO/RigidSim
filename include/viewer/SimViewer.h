@@ -40,6 +40,7 @@ private:
 
     void createMarbleBox();
     void createSphereOnBox();
+    void createBoxOnBox();
     void createBoxOnPlane();
     void createSphereOnPlane();
     void createBoxBallStack();

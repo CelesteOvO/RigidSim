@@ -95,6 +95,36 @@ public:
         bodyBox->mesh->setSurfaceColor({ 0.2f, 0.2f, 0.2f })->setSmoothShade(false)->setTransparency(0.4f);
     }
 
+    // Simple sphere falling on a box.
+    //
+    static void createBoxOnBox(RigidBodySystem& rigidBodySystem)
+    {
+        rigidBodySystem.clear();
+        polyscope::removeAllStructures();
+
+        std::cout << "Loading Box-on-box scenario." << std::endl;
+
+        // Create a sphere.
+        RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
+        body1->x.y() = 4.0f;
+        body1->q = Eigen::AngleAxisf(90, Eigen::Vector3f(1, 0, 0));
+        body1->mesh->setTransparency(0.5f);
+
+        /*RigidBody* body2 = new RigidBody(1.0f, new Sphere(0.5f), "D:\\project\\rigidBodyTutorial\\resources\\box.obj");
+        body2->x.y() = 6.0f;*/
+
+        RigidBody* bodyBox = new RigidBody(1.0f, new Box(Eigen::Vector3f(10.0f, 0.4f, 10.0f)), "D:\\project\\rigidBodyTutorial\\resources\\box_bot.obj");
+        bodyBox->fixed = true;
+
+        rigidBodySystem.addBody(body1);
+        //rigidBodySystem.addBody(body2);
+        rigidBodySystem.addBody(bodyBox);
+
+        body1->mesh->setSurfaceColor({ 0.1f, 1.0f, 0.2f })->setEdgeWidth(1.0f);
+        //body2->mesh->setSurfaceColor({ 0.1f, 1.0f, 0.2f })->setEdgeWidth(1.0f);
+        bodyBox->mesh->setSurfaceColor({ 0.2f, 0.2f, 0.2f })->setSmoothShade(false)->setTransparency(0.4f);
+    }
+
     // Box on a plane
     //
     static void createBoxOnPlane(RigidBodySystem& rigidBodySystem)
@@ -179,18 +209,18 @@ public:
         RigidBody* body2 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
         body2->x = Eigen::Vector3f(0.0f, 2.5f, 0.0f);
         body2->q = Eigen::AngleAxisf(90, Eigen::Vector3f(0, 1, 0));
-        RigidBody* body3 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
+       /* RigidBody* body3 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
         body3->x = Eigen::Vector3f(0.0f, 3.5f, 0.0f);
         body3->q = Eigen::AngleAxisf(-60, Eigen::Vector3f(0, 1, 0));
         RigidBody* body4 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
         body4->x = Eigen::Vector3f(0.0f, 4.5f, 0.0f);
-        body4->q = Eigen::AngleAxisf(135, Eigen::Vector3f(0, 1, 0));
+        body4->q = Eigen::AngleAxisf(135, Eigen::Vector3f(0, 1, 0));*/
 
         rigidBodySystem.addBody(body0);
         rigidBodySystem.addBody(body1);
         rigidBodySystem.addBody(body2);
-        rigidBodySystem.addBody(body3);
-        rigidBodySystem.addBody(body4);
+        /*rigidBodySystem.addBody(body3);
+        rigidBodySystem.addBody(body4);*/
     }
 
     // bunny on a plane

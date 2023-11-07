@@ -123,6 +123,9 @@ void SimViewer::drawGUI()
     if (ImGui::Button("Sphere on box")) {
         createSphereOnBox();
     }
+    if (ImGui::Button("Box on box")) {
+        createBoxOnBox();
+    }
     if (ImGui::Button("Marble box")) {
         createMarbleBox();
     }
@@ -174,6 +177,13 @@ void SimViewer::createMarbleBox()
 void SimViewer::createSphereOnBox()
 {
     Scenarios::createSphereOnBox(*m_rigidBodySystem);
+    updateRigidBodyMeshes(*m_rigidBodySystem);
+    polyscope::view::resetCameraToHomeView();
+}
+
+void SimViewer::createBoxOnBox()
+{
+    Scenarios::createBoxOnBox(*m_rigidBodySystem);
     updateRigidBodyMeshes(*m_rigidBodySystem);
     polyscope::view::resetCameraToHomeView();
 }

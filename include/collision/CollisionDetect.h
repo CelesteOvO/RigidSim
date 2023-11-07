@@ -52,9 +52,16 @@ private:
 
     void collisionDetectBoxBox(RigidBody* body0, RigidBody* body1);
 
-    /// further
-    float penetrationOnAxis(RigidBody *pBody, RigidBody *pBody1, const Eigen::Vector3f& matrix);
-    static float transformToAxis(RigidBody *pBody, const Eigen::Vector3f& axis);
+public:
+
+    static std::vector<Eigen::Vector3f> getFaceNormal(RigidBody* body, std::vector<Eigen::Vector3f> corners);
+    static std::vector<Eigen::Vector3f> getEdgeNormal(RigidBody* body1, RigidBody* body2, std::vector<Eigen::Vector3f> corners1, std::vector<Eigen::Vector3f> corners2);
+
+    static std::vector<Eigen::Vector3f> getCorners(RigidBody* body);
+
+    static int testSAT(float minOverlap, std::vector<Eigen::Vector3f> normals, RigidBody* body1, RigidBody* body2, const std::vector<Eigen::Vector3f>& corners1, const std::vector<Eigen::Vector3f>& corners2);
+    static float transformToAxis(RigidBody *pBody, const Eigen::Vector3f& axis, const std::vector<Eigen::Vector3f>& corners);
+
     void collisionDetectFaceVertex(RigidBody* body0, RigidBody* body1, Eigen::Vector3f axis, float penetration);
     void collisionDetectEdgeEdge(RigidBody* body0, RigidBody* body1, Eigen::Vector3f axis, float penetration, int oneAxisIndex, int twoAxisIndex);
 

@@ -103,12 +103,6 @@ void CollisionDetect::detectCollisions()
             {
                 collisionDetectBoxBox(body0, body1);
             }
-            // Test for box-box collision (order swap)
-            else if( body1->geometry->getType() == kBox &&
-                     body0->geometry->getType() == kBox )
-            {
-                collisionDetectBoxBox(body1, body0);
-            }
         }
     }
 }
@@ -245,84 +239,162 @@ void CollisionDetect::collisionDetectSpherePlane(RigidBody *body0, RigidBody *bo
 
 ///TODO: 有问题
 void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) {
-    std::vector<Eigen::Vector3f> axis;
+    // 求出两个box的八个顶点
+    std::vector<Eigen::Vector3f> corners1, corners2;
+    corners1 = getCorners(body0);
+    corners2 = getCorners(body1);
 
-    for (int i = 0; i < 3; i++) {
-        axis.emplace_back(body0->q.toRotationMatrix().col(i));
-        axis.emplace_back(body1->q.toRotationMatrix().matrix().col(i));
-    }
+    std::vector<Eigen::Vector3f> faceNormals1, faceNormals2;
+    faceNormals1 = getFaceNormal(body0, corners1);
+    faceNormals2 = getFaceNormal(body1, corners2);
 
-    for(int i = 0; i < 3; i++)
+    std::vector<Eigen::Vector3f> edgeNormals;
+    edgeNormals = getEdgeNormal(body0, body1, corners1, corners2);
+
+    // 把所有的normal放到一个vector中
+    std::vector<Eigen::Vector3f> normals;
+    normals.insert(normals.end(), faceNormals1.begin(), faceNormals1.end());
+    normals.insert(normals.end(), faceNormals2.begin(), faceNormals2.end());
+    normals.insert(normals.end(), edgeNormals.begin(), edgeNormals.end());
+
+    Eigen::Vector3f d = body0->x - body1->x;
+    // 测试所有的normal
+    float minOverlap = 1000000.0f;
+    int axis = testSAT(minOverlap, normals, body0, body1, corners1, corners2);
+
+    if (axis == -1)
+        return;
+    else if(axis <= 2) /// 发生face-vertex collision
     {
-        for(int j = 0; j < 3; j++)
-        {
-            Eigen::Vector3f temp = axis[i].cross(axis[3+j]);
-            if(temp.norm() > 1e-6f)
-                axis.emplace_back(temp.normalized());
+        collisionDetectFaceVertex(body0, body1, normals[axis], minOverlap);
+    }
+    else if(axis <= 5)
+    {
+        collisionDetectFaceVertex(body1, body0, normals[axis], minOverlap);
+    }
+    else
+    {
+        int oneAxisIndex = (axis - 6) / 3;
+        int twoAxisIndex = (axis - 6) % 3;
+        collisionDetectEdgeEdge(body0, body1, normals[axis], minOverlap, oneAxisIndex, twoAxisIndex);
+    }
+}
+
+std::vector<Eigen::Vector3f> CollisionDetect::getCorners(RigidBody *body) {
+    std::vector<Eigen::Vector3f> corners;
+
+    Box* box = dynamic_cast<Box*>(body->geometry.get());
+
+    Eigen::Vector3f center = body->x;
+    Eigen::Matrix3f orientation = body->q.toRotationMatrix();
+
+    Eigen::Vector3f halfExtents = box->dim / 2.0f;
+
+    // 盒子的局部坐标系的轴向量
+    Eigen::Vector3f localXAxis = orientation.col(0);
+    Eigen::Vector3f localYAxis = orientation.col(1);
+    Eigen::Vector3f localZAxis = orientation.col(2);
+
+    // 通过半边长和轴向量计算顶点位置
+    corners.emplace_back(center + halfExtents[0] * localXAxis + halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
+    corners.emplace_back(center - halfExtents[0] * localXAxis + halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
+    corners.emplace_back(center + halfExtents[0] * localXAxis - halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
+    corners.emplace_back(center - halfExtents[0] * localXAxis - halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
+    corners.emplace_back(center + halfExtents[0] * localXAxis + halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
+    corners.emplace_back(center - halfExtents[0] * localXAxis + halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
+    corners.emplace_back(center + halfExtents[0] * localXAxis - halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
+    corners.emplace_back(center - halfExtents[0] * localXAxis - halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
+
+    return corners;
+}
+
+std::vector<Eigen::Vector3f> CollisionDetect::getFaceNormal(RigidBody *body, std::vector<Eigen::Vector3f> corners) {
+    std::vector<Eigen::Vector3f> normals;
+    Eigen::Vector3f U = corners[1] - corners[0];
+    Eigen::Vector3f V = corners[2] - corners[0];
+    Eigen::Vector3f N = U.cross(V).normalized();
+    normals.push_back(N);
+
+    U = corners[6] - corners[2];
+    V = corners[3] - corners[2];
+    N = U.cross(V).normalized();
+    normals.push_back(N);
+
+    U = corners[4] - corners[6];
+    V = corners[2] - corners[6];
+    N = U.cross(V).normalized();
+    normals.push_back(N);
+
+    return normals;
+}
+
+std::vector<Eigen::Vector3f>
+CollisionDetect::getEdgeNormal(RigidBody *body1, RigidBody *body2, std::vector<Eigen::Vector3f> corners1,
+                               std::vector<Eigen::Vector3f> corners2) {
+    std::vector<Eigen::Vector3f> edgeNormals;
+    Eigen::Vector3f body1Edge[3];
+    Eigen::Vector3f body2Edge[3];
+
+    body1Edge[0] = corners1[1] - corners1[0];
+    body1Edge[1] = corners1[2] - corners1[0];
+    body1Edge[2] = corners1[4] - corners1[0];
+
+    body2Edge[0] = corners2[1] - corners2[0];
+    body2Edge[1] = corners2[2] - corners2[0];
+    body2Edge[2] = corners2[4] - corners2[0];
+
+    for (auto & i : body1Edge) {
+        for (const auto & j : body2Edge) {
+            Eigen::Vector3f N = i.cross(j).normalized();
+            edgeNormals.push_back(N);
         }
     }
+    return edgeNormals;
+}
 
-    float minOverlap = 1e10f;
-    unsigned int bestAxis = 15;
-    for (unsigned int i = 0; i < 15; i++)
+int CollisionDetect::testSAT(float minOverlap, std::vector<Eigen::Vector3f> normals, RigidBody* body0, RigidBody* body1, const std::vector<Eigen::Vector3f>& corners1, const std::vector<Eigen::Vector3f>& corners2) {
+    int axisNum = 0;
+
+    for (int i = 0; i < 15; i++)
     {
-        Eigen::Vector3f temp = axis[i];
-        if(temp.norm() < 1e-6f)
+        Eigen::Vector3f axis = normals[i];
+        if(axis.norm() < 1e-6f)
             continue;
-        temp.normalize();
-        float overlap = penetrationOnAxis(body0, body1, temp);
+        axis.normalize();
+
+        float hc1 = transformToAxis(body0, axis, corners1);
+        float hc2 = transformToAxis(body1, axis, corners2);
+        float center = abs((body0->x - body1->x).dot(axis));
+        float overlap = hc1 + hc2 - center;
+
         if(overlap < 0)
-            return;
+            return -1;
         if(overlap < minOverlap)
         {
             minOverlap = overlap;
-            bestAxis = i;
+            axisNum = i;
         }
     }
-
-    if(bestAxis <= 2)
-    {
-        collisionDetectFaceVertex(body0, body1, axis[bestAxis], minOverlap);
-    }else if(bestAxis <= 5)
-    {
-        collisionDetectFaceVertex(body1, body0, axis[bestAxis], minOverlap);
-    }else{
-        int oneAxisIndex = (bestAxis - 6) / 3;
-        int twoAxisIndex = bestAxis % 3;
-        collisionDetectEdgeEdge(body0, body1, axis[bestAxis], minOverlap, oneAxisIndex, twoAxisIndex);
-    }
+    return axisNum;
 }
 
-float CollisionDetect::penetrationOnAxis(RigidBody *pBody, RigidBody *pBody1, const Eigen::Vector3f& axis) {
-    float one = transformToAxis(pBody, axis);
-    float two = transformToAxis(pBody1, axis);
-    float center = abs((pBody->x - pBody1->x).dot(axis));
-    return one + two - center;
-}
-
-float CollisionDetect::transformToAxis(RigidBody *pBody, const Eigen::Vector3f &axis) {
-    Box* box0 = dynamic_cast<Box*>(pBody->geometry.get());
+float CollisionDetect::transformToAxis(RigidBody *pBody, const Eigen::Vector3f &axis, const std::vector<Eigen::Vector3f>& corners) {
     float projectionMax = -1e10f;
     float projectionMin = 1e10f;
-    for (float cx = -1.0f * box0->dim(0) / 2;cx < box0->dim(0);cx += box0->dim(0))
-    {
-        for (float cy = -1.0f * box0->dim(1) / 2;cy < box0->dim(1);cy += box0->dim(1))
-        {
-            for (float cz = -1.0f * box0->dim(2) / 2;cz < box0->dim(2);cz += box0->dim(2))
-            {
-                Eigen::Vector3f vertex = Eigen::Vector3f(cx,cy,cz);
-                float projection = vertex.dot(axis);
-                projectionMax = std::max(projectionMax,projection);
-                projectionMin = std::min(projectionMin,projection);
-            }
-        }
+    for (auto & corner : corners) {
+        float projection = corner.dot(axis);
+        if (projection > projectionMax)
+            projectionMax = projection;
+        if (projection < projectionMin)
+            projectionMin = projection;
     }
-    return (projectionMax - projectionMin) / 2.0f;
+    float hc = 0.5f * (projectionMax - projectionMin);
+    return hc;
 }
 
 void CollisionDetect::collisionDetectFaceVertex(RigidBody *body0, RigidBody *body1, Eigen::Vector3f axis,
                                                 float penetration) {
-    Eigen::Vector3f toCenter = body1->x - body0->x;
+    Eigen::Vector3f toCenter = body0->x - body1->x;
     if(axis.dot(toCenter) > 0)
         axis *= -1;
     Box* box1 = dynamic_cast<Box*>(body1->geometry.get());
@@ -337,27 +409,26 @@ void CollisionDetect::collisionDetectFaceVertex(RigidBody *body0, RigidBody *bod
     m_contacts.push_back(new Contact(body0, body1, vertex, axis, penetration));
 }
 
-void
-CollisionDetect::collisionDetectEdgeEdge(RigidBody *body0, RigidBody *body1, Eigen::Vector3f axis, float penetration, int oneAxisIndex, int twoAxisIndex) {
+void CollisionDetect::collisionDetectEdgeEdge(RigidBody *body0, RigidBody *body1, Eigen::Vector3f axis, float penetration, int oneAxisIndex, int twoAxisIndex) {
     Eigen::Vector3f toCenter = body1->x - body0->x;
     if(axis.dot(toCenter) > 0)
-        axis *= -1;
+    axis *= -1;
     Eigen::Vector3f ptOnEdgeOne = body0->x;
     Eigen::Vector3f ptOnEdgeTwo = body1->x;
     Box* box0 = dynamic_cast<Box*>(body0->geometry.get());
     Box* box1 = dynamic_cast<Box*>(body1->geometry.get());
     for(int i = 0; i < 3; i++)
     {
-        if(i == oneAxisIndex){}
-        else if(body0->q.toRotationMatrix().col(i).dot(axis) > 0)
-            ptOnEdgeOne -= box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
-        else
-            ptOnEdgeOne += box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
-        if(i == twoAxisIndex){}
-        else if(body1->q.toRotationMatrix().col(i).dot(axis) < 0)
-            ptOnEdgeTwo -= box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
-        else
-            ptOnEdgeTwo += box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
+    if(i == oneAxisIndex){}
+    else if(body0->q.toRotationMatrix().col(i).dot(axis) > 0)
+    ptOnEdgeOne -= box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
+    else
+    ptOnEdgeOne += box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
+    if(i == twoAxisIndex){}
+    else if(body1->q.toRotationMatrix().col(i).dot(axis) < 0)
+    ptOnEdgeTwo -= box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
+    else
+    ptOnEdgeTwo += box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
     }
     Eigen::Vector3f axisOne = body0->q.toRotationMatrix().col(oneAxisIndex);
     Eigen::Vector3f axisTwo = body1->q.toRotationMatrix().col(twoAxisIndex);
@@ -379,3 +450,9 @@ CollisionDetect::collisionDetectEdgeEdge(RigidBody *body0, RigidBody *body1, Eig
 
     m_contacts.push_back(new Contact(body0, body1, 0.5f * (ptOne + ptTwo), axis, penetration));
 }
+
+
+
+
+
+
