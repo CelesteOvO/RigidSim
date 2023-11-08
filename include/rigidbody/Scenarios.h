@@ -107,7 +107,7 @@ public:
         // Create a sphere.
         RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
         body1->x.y() = 4.0f;
-        body1->q = Eigen::AngleAxisf(135, Eigen::Vector3f(1, 0, 0));
+        //body1->q = Eigen::AngleAxisf(135, Eigen::Vector3f(1, 0, 0));
         body1->mesh->setTransparency(0.5f);
 
         /*RigidBody* body2 = new RigidBody(1.0f, new Sphere(0.5f), "D:\\project\\rigidBodyTutorial\\resources\\box.obj");

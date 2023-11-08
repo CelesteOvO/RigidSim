@@ -5,6 +5,7 @@
 #include "rigidbody/RigidBodySystem.h"
 
 float CollisionDetect::s_contactTime;
+float CollisionDetect::s_minAxisPenetrationDepth;
 Eigen::Vector3f CollisionDetect::s_contactNormal;
 
 namespace
@@ -282,8 +283,11 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
         for(int j = 0; j < 3; ++j)
         {
             Eigen::Vector3f axis = faceNormals1[i].cross(faceNormals2[j]);
-            if (axis.dot(axis) <= std::numeric_limits<float>::epsilon()) // skip almost parallel edges
+            if (axis.dot(axis) <= std::numeric_limits<float>::epsilon())// skip almost parallel edges
+            {
                 FindContactSet(body0, body1, side, box0Cfg, box1Cfg, s_contactTime);
+                return;
+            }
             if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
                 return;
         }
@@ -304,6 +308,9 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
         if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
             return;
     }
+
+    if (s_contactTime <= 0.0f || side == intersectConfig::NONE)
+        return;
 
     FindContactSet(body0, body1, side, box0Cfg, box1Cfg, s_contactTime);
 }
@@ -335,7 +342,7 @@ std::vector<Eigen::Vector3f> CollisionDetect::getCorners(RigidBody *body) {
 }
 
 std::vector<Eigen::Vector3f> CollisionDetect::getFaceNormal(RigidBody *body, std::vector<Eigen::Vector3f> corners) {
-    std::vector<Eigen::Vector3f> normals;
+    /*std::vector<Eigen::Vector3f> normals;
     Eigen::Vector3f U = corners[1] - corners[0];
     Eigen::Vector3f V = corners[2] - corners[0];
     Eigen::Vector3f N = U.cross(V).normalized();
@@ -349,9 +356,9 @@ std::vector<Eigen::Vector3f> CollisionDetect::getFaceNormal(RigidBody *body, std
     U = corners[4] - corners[6];
     V = corners[2] - corners[6];
     N = U.cross(V).normalized();
-    normals.push_back(N);
+    normals.push_back(N);*/
 
-    /*std::vector<Eigen::Vector3f> normals;
+    std::vector<Eigen::Vector3f> normals;
     Eigen::Vector3f N = body->q.toRotationMatrix() * Eigen::Vector3f(1, 0, 0);
     normals.push_back(N);
 
@@ -359,7 +366,7 @@ std::vector<Eigen::Vector3f> CollisionDetect::getFaceNormal(RigidBody *body, std
     normals.push_back(N);
 
     N = body->q.toRotationMatrix() * Eigen::Vector3f(0, 0, 1);
-    normals.push_back(N);*/
+    normals.push_back(N);
 
     return normals;
 }
@@ -488,8 +495,19 @@ void CollisionDetect::FindContactSet(RigidBody *obb0, RigidBody *obb1, int side,
     box0Final->x = obb0->x + tfirst * obb0->xdot;
     box1Final->x = obb1->x + tfirst * obb1->xdot;
 
-    const int *b0Index = box0Cfg.m_index;
-    const int *b1Index = box1Cfg.m_index;
+    int *b0Index = box0Cfg.m_index;
+    int *b1Index = box1Cfg.m_index;
+
+    std::cout << "b0: ";
+    for (int i = 0; i < 8; i++) {
+        std::cout << b0Index[i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "b1: ";
+    for (int i = 0; i < 8; i++) {
+        std::cout << b1Index[i] << " ";
+    }
+    std::cout << std::endl;
     
     if (side == intersectConfig::LEFT)
     {
@@ -627,11 +645,16 @@ void CollisionDetect::FindContactSet(RigidBody *obb0, RigidBody *obb1, int side,
     float diff = direction.dot(s_contactNormal);
     if (diff > 0.0f)
         s_contactNormal = -s_contactNormal;
+
+    /*std::cout << "normal: " << s_contactNormal << std::endl
+              << "Points: " << numPts << std::endl
+              << "End" << std::endl
+              << std::endl;*/
+
     for(int i = 0; i < numPts; i++)
     {
         Eigen::Vector3f p = pts[i];
-        float phi = -(p - obb0->x).dot(s_contactNormal);
-        m_contacts.push_back( new Contact(obb0, obb1, p, s_contactNormal, phi) );
+        m_contacts.push_back( new Contact(obb0, obb1, p, s_contactNormal, s_minAxisPenetrationDepth) );
     }
 }
 
@@ -850,6 +873,100 @@ CollisionDetect::segmentThroughPlane(const std::vector<Eigen::Vector3f> &segment
     // intersects with U.
     float ratio = (u - v0) / (v1 - v0);
     pts[0]     = segment[0] + ratio * (segment[1] - segment[0]);
+}
+
+void
+CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, float speed, float tmax, float &tlast) {
+    s_minAxisPenetrationDepth = std::numeric_limits<float>::max();
+    float invSpeed, t;
+    if (max1 < min0) // box1 initially on left of box0
+    {
+        if (speed <= 0.0f)
+            // The projection intervals are moving apart.
+            return;
+
+        invSpeed = 1.0f / speed;
+
+        t        = (min0 - max1) * invSpeed;
+
+        if (t > s_contactTime)
+            s_contactTime = t;
+
+        if (s_contactTime > tmax)
+            // intervals do not intersect during the specified time.
+            return;
+
+        t = (max0 - min1) * invSpeed;
+
+        if (t < tlast)
+            tlast = t;
+
+        if (s_contactTime > tlast)
+            // Physically inconsistent times--the objects cannot intersect.
+            return;
+
+        float currPenetration = max1 - min0;
+        if (currPenetration < s_minAxisPenetrationDepth)
+            s_minAxisPenetrationDepth = currPenetration;
+    } else if (max0 < min1) // box1 initially on right of box0
+    {
+        if (speed >= 0.0f)
+            // The projection intervals are moving apart.
+            return;
+
+        invSpeed = 1.0f / speed;
+
+        t        = (max0 - min1) * invSpeed;
+
+        if (t > s_contactTime)
+            s_contactTime = t;
+
+        if (s_contactTime > tmax)
+            // intervals do not intersect during the specified time.
+            return;
+
+        t = (min0 - max1) * invSpeed;
+
+        if (t < tlast)
+            tlast = t;
+
+        if (s_contactTime > tlast)
+            // Physically inconsistent times--the objects cannot intersect.
+            return;
+
+        float currPenetration = max0 - min1;
+        if (currPenetration < s_minAxisPenetrationDepth)
+            s_minAxisPenetrationDepth = currPenetration;
+    } else // box0 and box1 initially overlap
+    {
+        if (speed > 0.0f) {
+            t = (max0 - min1) / speed;
+
+            if (t < tlast)
+                tlast = t;
+
+            if (s_contactTime > tlast)
+                // Physically inconsistent times--the objects cannot intersect.
+                return;
+
+            float currPenetration = max1 - min0;
+            if (currPenetration < s_minAxisPenetrationDepth)
+                s_minAxisPenetrationDepth = currPenetration;
+        } else if (speed < 0.0f) {
+            t = (min0 - max1) / speed;
+
+            if (t < tlast)
+                tlast = t;
+
+            if (s_contactTime > tlast)
+                // Physically inconsistent times--the objects cannot intersect.
+                return;
+
+            float currPenetration = max0 - min1;
+            if (currPenetration < s_minAxisPenetrationDepth)
+                s_minAxisPenetrationDepth = currPenetration;
+        }
+    }
 }
 
 

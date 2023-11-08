@@ -39,6 +39,6 @@ public:
      *	\Param		const Obb * obb
      *	\return		void
      */
-    void setConfiguration(const Eigen::Vector3f &axis, const RigidBody *obb);
+    void setConfiguration(const Eigen::Vector3f &axis, RigidBody *obb);
 };
 #endif //RIGIDBODYTUTORIAL_INTERSECTIONCONFIG_H

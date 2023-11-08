@@ -3,7 +3,7 @@
 //
 #include "IntersectionConfig.h"
 
-void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, const RigidBody *obb) {
+void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *obb) {
     Box* box = dynamic_cast<Box*>(obb->geometry.get());
     float axes[3] = {axis.dot(obb->q.toRotationMatrix().col(0)), axis.dot(obb->q.toRotationMatrix().col(1)), axis.dot(obb->q.toRotationMatrix().col(2))};
     float absAxes[3] = {std::abs(axes[0]), std::abs(axes[1]), std::abs(axes[2])};

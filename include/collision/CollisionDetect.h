@@ -62,6 +62,7 @@ public:
     static bool FindintersectionOnAxis(RigidBody* obb0, RigidBody* obb1, Eigen::Vector3f &axis, Eigen::Vector3f &relVelocity, float &tfirst, float &tlast, int &side, intersectConfig &box0Cfg,  intersectConfig &box1Cfg);
     void FindContactSet(RigidBody* obb0, RigidBody* obb1, int side, intersectConfig &box0Cfg, intersectConfig &box1Cfg, float tfirst);
     static Eigen::Vector3f GetPointFromIndex(RigidBody* body, int index);
+    static void IsSeparated(float min0, float max0, float min1, float max1, float speed, float tmax, float &tlast);
     void segmentSegment(const std::vector<Eigen::Vector3f>& segment0, const std::vector<Eigen::Vector3f>& segment1, int &numPts, Eigen::Vector3f *pts);
     static void coplanarSegmentRectangle(const std::vector<Eigen::Vector3f>& segment, const std::vector<Eigen::Vector3f>& rectangle, int &numPts, Eigen::Vector3f *pts);
     static void coplanarRectangleRectangle(std::vector<Eigen::Vector3f> rectangle0, std::vector<Eigen::Vector3f> rectangle1, int &numPts, Eigen::Vector3f *pts);
@@ -73,4 +74,5 @@ private:
     std::vector<Contact*> m_contacts;       // Contact array.
     static float s_contactTime;
     static Eigen::Vector3f s_contactNormal;
+    static float s_minAxisPenetrationDepth;
 };
