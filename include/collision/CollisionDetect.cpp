@@ -4,6 +4,9 @@
 #include "rigidbody/RigidBody.h"
 #include "rigidbody/RigidBodySystem.h"
 
+float CollisionDetect::s_contactTime;
+Eigen::Vector3f CollisionDetect::s_contactNormal;
+
 namespace
 {
     // Plane-point collision test.
@@ -239,6 +242,15 @@ void CollisionDetect::collisionDetectSpherePlane(RigidBody *body0, RigidBody *bo
 
 ///TODO: 有问题
 void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) {
+
+    s_contactTime = 0.0f;
+    float tlast = std::numeric_limits<float>::max();
+
+    Eigen::Vector3f relVelocity = body0->xdot - body1->xdot;
+
+    int side = intersectConfig::NONE;
+    intersectConfig box0Cfg, box1Cfg;
+
     // 求出两个box的八个顶点
     std::vector<Eigen::Vector3f> corners1, corners2;
     corners1 = getCorners(body0);
@@ -248,36 +260,52 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
     faceNormals1 = getFaceNormal(body0, corners1);
     faceNormals2 = getFaceNormal(body1, corners2);
 
-    std::vector<Eigen::Vector3f> edgeNormals;
-    edgeNormals = getEdgeNormal(body0, body1, corners1, corners2);
-
-    // 把所有的normal放到一个vector中
-    std::vector<Eigen::Vector3f> normals;
-    normals.insert(normals.end(), faceNormals1.begin(), faceNormals1.end());
-    normals.insert(normals.end(), faceNormals2.begin(), faceNormals2.end());
-    normals.insert(normals.end(), edgeNormals.begin(), edgeNormals.end());
-
-    Eigen::Vector3f d = body0->x - body1->x;
-    // 测试所有的normal
-    float minOverlap = 1000000.0f;
-    int axis = testSAT(minOverlap, normals, body0, body1, corners1, corners2);
-
-    if (axis == -1)
-        return;
-    else if(axis <= 2) /// 发生face-vertex collision
+    for(int i = 0; i < 3; i++)
     {
-        collisionDetectFaceVertex(body0, body1, normals[axis], minOverlap);
+        Eigen::Vector3f axis = faceNormals1[i];
+        if(!FindintersectionOnAxis(body0, body1, axis, relVelocity,  s_contactTime, tlast,side, box0Cfg, box1Cfg))
+            return;
     }
-    else if(axis <= 5)
+
+    for(int i = 0; i < 3; i++)
     {
-        collisionDetectFaceVertex(body1, body0, normals[axis], minOverlap);
+        Eigen::Vector3f axis = faceNormals2[i];
+        if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
+            return;
     }
-    else
+
+   /* std::vector<Eigen::Vector3f> edgeNormals;
+    edgeNormals = getEdgeNormal(body0, body1, corners1, corners2);*/
+
+    for(int i = 0; i < 3; i++)
     {
-        int oneAxisIndex = (axis - 6) / 3;
-        int twoAxisIndex = (axis - 6) % 3;
-        collisionDetectEdgeEdge(body0, body1, normals[axis], minOverlap, oneAxisIndex, twoAxisIndex);
+        for(int j = 0; j < 3; ++j)
+        {
+            Eigen::Vector3f axis = faceNormals1[i].cross(faceNormals2[j]);
+            if (axis.dot(axis) <= std::numeric_limits<float>::epsilon()) // skip almost parallel edges
+                FindContactSet(body0, body1, side, box0Cfg, box1Cfg, s_contactTime);
+            if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
+                return;
+        }
     }
+
+    // velocity cross box 0 edges
+    for(int i = 0; i < 3; i++)
+    {
+        Eigen::Vector3f axis = faceNormals1[i].cross(relVelocity);
+        if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
+            return;
+    }
+
+    // velocity cross box 1 edges
+    for(int i = 0; i < 3; i++)
+    {
+        Eigen::Vector3f axis = faceNormals2[i].cross(relVelocity);
+        if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
+            return;
+    }
+
+    FindContactSet(body0, body1, side, box0Cfg, box1Cfg, s_contactTime);
 }
 
 std::vector<Eigen::Vector3f> CollisionDetect::getCorners(RigidBody *body) {
@@ -288,22 +316,20 @@ std::vector<Eigen::Vector3f> CollisionDetect::getCorners(RigidBody *body) {
     Eigen::Vector3f center = body->x;
     Eigen::Matrix3f orientation = body->q.toRotationMatrix();
 
-    Eigen::Vector3f halfExtents = box->dim / 2.0f;
+    // 计算顶点的局部坐标
+    corners.emplace_back(0.5f*Eigen::Vector3f(-box->dim(0), -box->dim(1), -box->dim(2)));
+    corners.emplace_back(0.5f*Eigen::Vector3f(-box->dim(0), -box->dim(1),  box->dim(2)));
+    corners.emplace_back(0.5f*Eigen::Vector3f(-box->dim(0),  box->dim(1), -box->dim(2)));
+    corners.emplace_back(0.5f*Eigen::Vector3f(-box->dim(0),  box->dim(1),  box->dim(2)));
+    corners.emplace_back(0.5f*Eigen::Vector3f( box->dim(0), -box->dim(1), -box->dim(2)));
+    corners.emplace_back(0.5f*Eigen::Vector3f( box->dim(0), -box->dim(1),  box->dim(2)));
+    corners.emplace_back(0.5f*Eigen::Vector3f( box->dim(0),  box->dim(1), -box->dim(2)));
+    corners.emplace_back(0.5f*Eigen::Vector3f( box->dim(0),  box->dim(1),  box->dim(2)));
 
-    // 盒子的局部坐标系的轴向量
-    Eigen::Vector3f localXAxis = orientation.col(0);
-    Eigen::Vector3f localYAxis = orientation.col(1);
-    Eigen::Vector3f localZAxis = orientation.col(2);
-
-    // 通过半边长和轴向量计算顶点位置
-    corners.emplace_back(center + halfExtents[0] * localXAxis + halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
-    corners.emplace_back(center - halfExtents[0] * localXAxis + halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
-    corners.emplace_back(center + halfExtents[0] * localXAxis - halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
-    corners.emplace_back(center - halfExtents[0] * localXAxis - halfExtents[1] * localYAxis + halfExtents[2] * localZAxis);
-    corners.emplace_back(center + halfExtents[0] * localXAxis + halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
-    corners.emplace_back(center - halfExtents[0] * localXAxis + halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
-    corners.emplace_back(center + halfExtents[0] * localXAxis - halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
-    corners.emplace_back(center - halfExtents[0] * localXAxis - halfExtents[1] * localYAxis - halfExtents[2] * localZAxis);
+    // 计算顶点的世界坐标
+    for (auto & corner : corners) {
+        corner = orientation * corner + center;
+    }
 
     return corners;
 }
@@ -324,6 +350,16 @@ std::vector<Eigen::Vector3f> CollisionDetect::getFaceNormal(RigidBody *body, std
     V = corners[2] - corners[6];
     N = U.cross(V).normalized();
     normals.push_back(N);
+
+    /*std::vector<Eigen::Vector3f> normals;
+    Eigen::Vector3f N = body->q.toRotationMatrix() * Eigen::Vector3f(1, 0, 0);
+    normals.push_back(N);
+
+    N = body->q.toRotationMatrix() * Eigen::Vector3f(0, 1, 0);
+    normals.push_back(N);
+
+    N = body->q.toRotationMatrix() * Eigen::Vector3f(0, 0, 1);
+    normals.push_back(N);*/
 
     return normals;
 }
@@ -352,104 +388,471 @@ CollisionDetect::getEdgeNormal(RigidBody *body1, RigidBody *body2, std::vector<E
     return edgeNormals;
 }
 
-int CollisionDetect::testSAT(float minOverlap, std::vector<Eigen::Vector3f> normals, RigidBody* body0, RigidBody* body1, const std::vector<Eigen::Vector3f>& corners1, const std::vector<Eigen::Vector3f>& corners2) {
-    int axisNum = 0;
+bool CollisionDetect::FindintersectionOnAxis(RigidBody *obb0, RigidBody *obb1, Eigen::Vector3f &axis,
+                                             Eigen::Vector3f &relVelocity, float &tfirst, float &tlast, int &side, intersectConfig &box0Cfg,
+                                             intersectConfig &box1Cfg) {
+    intersectConfig box0CfgStart;
+    box0CfgStart.setConfiguration(axis, obb0);
 
-    for (int i = 0; i < 15; i++)
+    intersectConfig box1CfgStart;
+    box1CfgStart.setConfiguration(axis, obb1);
+
+    float t;
+    float speed = relVelocity.dot(axis);
+
+    if (box1CfgStart.m_max < box0CfgStart.m_min) // object1 left of object0
     {
-        Eigen::Vector3f axis = normals[i];
-        if(axis.norm() < 1e-6f)
-            continue;
-        axis.normalize();
-
-        float hc1 = transformToAxis(body0, axis, corners1);
-        float hc2 = transformToAxis(body1, axis, corners2);
-        float center = abs((body0->x - body1->x).dot(axis));
-        float overlap = hc1 + hc2 - center;
-
-        if(overlap < 0)
-            return -1;
-        if(overlap < minOverlap)
+        if(speed <= 0.0f)
+            return false;
+        t = (box0CfgStart.m_min - box1CfgStart.m_max) / speed;
+        if (t > tfirst)
         {
-            minOverlap = overlap;
-            axisNum = i;
+            tfirst = t;
+            side = intersectConfig::LEFT;
+            box0Cfg = box0CfgStart;
+            box1Cfg = box1CfgStart;
+            s_contactNormal = axis;
+        }
+
+        t = (box0CfgStart.m_max - box1CfgStart.m_min) / speed;
+        if (t < tlast)
+            tlast = t;
+
+        if (tfirst > tlast)
+            return false;
+    }
+    else if (box0CfgStart.m_max < box1CfgStart.m_min)
+    {
+        if (speed >= 0.0f) // object1 moving away from object0
+            return false;
+
+        // find first time of contact on this axis
+        t = (box0CfgStart.m_max - box1CfgStart.m_min) / speed;
+
+        // If this is the new maximum first time of contact,  set side and
+        // configuration.
+        if (t > tfirst) {
+            tfirst          = t;
+            side            = intersectConfig::RIGHT;
+            box0Cfg    = box0CfgStart;
+            box1Cfg    = box1CfgStart;
+            s_contactNormal = axis;
+        }
+
+        // find last time of contact on this axis
+        t = (box0CfgStart.m_min - box1CfgStart.m_max) / speed;
+        if (t < tlast)
+            tlast = t;
+
+        // quick out: intersection before desired interval
+        if (tfirst > tlast)
+            return false;
+    }
+    else
+    {
+        if (speed > 0.0f) {
+            // find last time of contact on this axis
+            t = (box0CfgStart.m_max - box1CfgStart.m_min) / speed;
+            if (t < tlast) {
+                tlast           = t;
+                s_contactNormal = axis;
+            }
+
+            // quick out: intersection before desired interval
+            if (tfirst > tlast)
+                return false;
+        } else if (speed < 0.0f) {
+            // find last time of contact on this axis
+            t = (box0CfgStart.m_min - box1CfgStart.m_max) / speed;
+            if (t < tlast) {
+                tlast           = t;
+                s_contactNormal = axis;
+            }
+
+            // quick out: intersection before desired interval
+            if (tfirst > tlast)
+                return false;
         }
     }
-    return axisNum;
+    return true;
 }
 
-float CollisionDetect::transformToAxis(RigidBody *pBody, const Eigen::Vector3f &axis, const std::vector<Eigen::Vector3f>& corners) {
-    float projectionMax = -1e10f;
-    float projectionMin = 1e10f;
-    for (auto & corner : corners) {
-        float projection = corner.dot(axis);
-        if (projection > projectionMax)
-            projectionMax = projection;
-        if (projection < projectionMin)
-            projectionMin = projection;
-    }
-    float hc = 0.5f * (projectionMax - projectionMin);
-    return hc;
-}
+void CollisionDetect::FindContactSet(RigidBody *obb0, RigidBody *obb1, int side, intersectConfig &box0Cfg,
+                                     intersectConfig &box1Cfg, float tfirst) {
+    Eigen::Vector3f pts[8];
+    int numPts = 0;
+    
+    RigidBody *box0Final, *box1Final;
+    box0Final          = obb0;
+    box1Final          = obb1;
+    box0Final->x = obb0->x + tfirst * obb0->xdot;
+    box1Final->x = obb1->x + tfirst * obb1->xdot;
 
-void CollisionDetect::collisionDetectFaceVertex(RigidBody *body0, RigidBody *body1, Eigen::Vector3f axis,
-                                                float penetration) {
-    Eigen::Vector3f toCenter = body0->x - body1->x;
-    if(axis.dot(toCenter) > 0)
-        axis *= -1;
-    Box* box1 = dynamic_cast<Box*>(body1->geometry.get());
-    Eigen::Vector3f vertex = body1->x + box1->dim(0) * body1->q.toRotationMatrix().col(0) + box1->dim(1) * body1->q.toRotationMatrix().col(1) + box1->dim(2) * body1->q.toRotationMatrix().col(2);
-    if(body1->q.toRotationMatrix().col(0).dot(axis) < 0)
-        vertex -= body1->q.toRotationMatrix().col(0);
-    if(body1->q.toRotationMatrix().col(1).dot(axis) < 0)
-        vertex -= body1->q.toRotationMatrix().col(1);
-    if(body1->q.toRotationMatrix().col(2).dot(axis) < 0)
-        vertex -= body1->q.toRotationMatrix().col(2);
-
-    m_contacts.push_back(new Contact(body0, body1, vertex, axis, penetration));
-}
-
-void CollisionDetect::collisionDetectEdgeEdge(RigidBody *body0, RigidBody *body1, Eigen::Vector3f axis, float penetration, int oneAxisIndex, int twoAxisIndex) {
-    Eigen::Vector3f toCenter = body1->x - body0->x;
-    if(axis.dot(toCenter) > 0)
-    axis *= -1;
-    Eigen::Vector3f ptOnEdgeOne = body0->x;
-    Eigen::Vector3f ptOnEdgeTwo = body1->x;
-    Box* box0 = dynamic_cast<Box*>(body0->geometry.get());
-    Box* box1 = dynamic_cast<Box*>(body1->geometry.get());
-    for(int i = 0; i < 3; i++)
+    const int *b0Index = box0Cfg.m_index;
+    const int *b1Index = box1Cfg.m_index;
+    
+    if (side == intersectConfig::LEFT)
     {
-    if(i == oneAxisIndex){}
-    else if(body0->q.toRotationMatrix().col(i).dot(axis) > 0)
-    ptOnEdgeOne -= box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
-    else
-    ptOnEdgeOne += box0->dim(i) / 2.0f * body0->q.toRotationMatrix().col(i);
-    if(i == twoAxisIndex){}
-    else if(body1->q.toRotationMatrix().col(i).dot(axis) < 0)
-    ptOnEdgeTwo -= box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
-    else
-    ptOnEdgeTwo += box1->dim(i) / 2.0f * body1->q.toRotationMatrix().col(i);
+        if (box0Cfg.m_map == intersectConfig::m1_1)
+        {
+            // box0point-box1face
+            numPts = 1;
+            pts[0] = GetPointFromIndex(box0Final, b0Index[0]);
+            std::cout << "0 - point-face collision!" << std::endl;
+        }else if (box1Cfg.m_map == intersectConfig::m1_1) {
+            // box0face-box1point
+            numPts = 1;
+            pts[0] = GetPointFromIndex(box1Final, b1Index[7]);
+            std::cout << "1 - face-point collision!" << std::endl;
+        } else if (box0Cfg.m_map == intersectConfig::m2_2) {
+            if (box1Cfg.m_map == intersectConfig::m2_2) {
+                // box0edge-box1edge intersection
+                std::vector<Eigen::Vector3f> edge0(2), edge1(2);
+                edge0[0] = GetPointFromIndex(box0Final, b0Index[0]);
+                edge0[1] = GetPointFromIndex(box0Final, b0Index[1]);
+                edge1[0] = GetPointFromIndex(box1Final, b1Index[6]);
+                edge1[1] = GetPointFromIndex(box1Final, b1Index[7]);
+                segmentSegment(edge0, edge1, numPts, pts);
+                std::cout << "2 - edge-edge collision!" << std::endl;
+            } else // box1Cfg.m_map == m44
+            {
+                // box0edge-box1face intersection
+                std::vector<Eigen::Vector3f> edge0(2), face1(4);
+                edge0[0] = GetPointFromIndex(box0Final, b0Index[0]);
+                edge0[1] = GetPointFromIndex(box0Final, b0Index[1]);
+                face1[0] = GetPointFromIndex(box1Final, b1Index[4]);
+                face1[1] = GetPointFromIndex(box1Final, b1Index[5]);
+                face1[2] = GetPointFromIndex(box1Final, b1Index[6]);
+                face1[3] = GetPointFromIndex(box1Final, b1Index[7]);
+                coplanarSegmentRectangle(edge0, face1, numPts, pts);
+                std::cout << "3 - edge-face collision!" << std::endl;
+            }
+        } else
+        {
+            if (box1Cfg.m_map == intersectConfig::m2_2) {
+                // box0face-box1edge intersection
+                std::vector<Eigen::Vector3f> face0(4), edge1(2);
+                face0[0] = GetPointFromIndex(box0Final, b0Index[0]);
+                face0[1] = GetPointFromIndex(box0Final, b0Index[1]);
+                face0[2] = GetPointFromIndex(box0Final, b0Index[2]);
+                face0[3] = GetPointFromIndex(box0Final, b0Index[3]);
+                edge1[0] = GetPointFromIndex(box1Final, b1Index[6]);
+                edge1[1] = GetPointFromIndex(box1Final, b1Index[7]);
+                coplanarSegmentRectangle(edge1, face0, numPts, pts);
+                std::cout << "4 - face-edge collision!" << std::endl;
+            } else {
+                // box0face-box1face intersection
+                std::vector<Eigen::Vector3f> face0(4), face1(4);
+                face0[0] = GetPointFromIndex(box0Final, b0Index[0]);
+                face0[1] = GetPointFromIndex(box0Final, b0Index[1]);
+                face0[2] = GetPointFromIndex(box0Final, b0Index[2]);
+                face0[3] = GetPointFromIndex(box0Final, b0Index[3]);
+                face1[0] = GetPointFromIndex(box1Final, b1Index[4]);
+                face1[1] = GetPointFromIndex(box1Final, b1Index[5]);
+                face1[2] = GetPointFromIndex(box1Final, b1Index[6]);
+                face1[3] = GetPointFromIndex(box1Final, b1Index[7]);
+                coplanarRectangleRectangle(face0, face1, numPts, pts);
+                std::cout << "5 - face-face collision!" << std::endl;
+            }
+        }
+    }else // side == RIGHT
+    {
+        // box1 on right of box0
+        if (box0Cfg.m_map == intersectConfig::m1_1) {
+            // box0point-box1face
+            numPts = 1;
+            pts[0] = GetPointFromIndex(box0Final, b0Index[7]);
+            std::cout << "6 - point-face collision!" << std::endl;
+        } else if (box1Cfg.m_map == intersectConfig::m1_1) {
+            // box0face-box1point
+            numPts = 1;
+            pts[0] = GetPointFromIndex(box1Final, b1Index[0]);
+            std::cout << "7 - face-point collision!" << std::endl;
+        } else if (box0Cfg.m_map == intersectConfig::m2_2) {
+            if (box1Cfg.m_map == intersectConfig::m2_2) {
+                // box0edge-box1edge intersection
+                std::vector<Eigen::Vector3f> edge0(2), edge1(2);
+                edge0[0] = GetPointFromIndex(box0Final, b0Index[6]);
+                edge0[1] = GetPointFromIndex(box0Final, b0Index[7]);
+                edge1[0] = GetPointFromIndex(box1Final, b1Index[0]);
+                edge1[1] = GetPointFromIndex(box1Final, b1Index[1]);
+                segmentSegment(edge0, edge1, numPts, pts);
+                std::cout << "8 - edge-edge collision!" << std::endl;
+            } else // box1Cfg.m_map == m44
+            {
+                // box0edge-box1face intersection
+                std::vector<Eigen::Vector3f> edge0(2), face1(4);
+                edge0[0] = GetPointFromIndex(box0Final, b0Index[6]);
+                edge0[1] = GetPointFromIndex(box0Final, b0Index[7]);
+                face1[0] = GetPointFromIndex(box1Final, b1Index[0]);
+                face1[1] = GetPointFromIndex(box1Final, b1Index[1]);
+                face1[2] = GetPointFromIndex(box1Final, b1Index[2]);
+                face1[3] = GetPointFromIndex(box1Final, b1Index[3]);
+                coplanarSegmentRectangle(edge0, face1, numPts, pts);
+                std::cout << "9 - edge-face collision!" << std::endl;
+            }
+        } else // box0Cfg.m_map == m44
+        {
+            if (box1Cfg.m_map == intersectConfig::m2_2) {
+                // box0face-box1edge intersection
+                std::vector<Eigen::Vector3f> face0(4), edge1(2);
+                face0[0] = GetPointFromIndex(box0Final, b0Index[4]);
+                face0[1] = GetPointFromIndex(box0Final, b0Index[5]);
+                face0[2] = GetPointFromIndex(box0Final, b0Index[6]);
+                face0[3] = GetPointFromIndex(box0Final, b0Index[7]);
+                edge1[0] = GetPointFromIndex(box1Final, b1Index[0]);
+                edge1[1] = GetPointFromIndex(box1Final, b1Index[1]);
+                coplanarSegmentRectangle(edge1, face0, numPts, pts);
+                std::cout << "10 - face-edge collision!" << std::endl;
+            } else // box1Cfg.m_map == m44
+            {
+                // box0face-box1face intersection
+                std::vector<Eigen::Vector3f> face0(4), face1(4);
+                face0[0] = GetPointFromIndex(box0Final, b0Index[4]);
+                face0[1] = GetPointFromIndex(box0Final, b0Index[5]);
+                face0[2] = GetPointFromIndex(box0Final, b0Index[6]);
+                face0[3] = GetPointFromIndex(box0Final, b0Index[7]);
+                face1[0] = GetPointFromIndex(box1Final, b1Index[0]);
+                face1[1] = GetPointFromIndex(box1Final, b1Index[1]);
+                face1[2] = GetPointFromIndex(box1Final, b1Index[2]);
+                face1[3] = GetPointFromIndex(box1Final, b1Index[3]);
+                coplanarRectangleRectangle(face0, face1, numPts, pts);
+                std::cout << "11 - face-face collision!" << std::endl;
+            }
+        }
     }
-    Eigen::Vector3f axisOne = body0->q.toRotationMatrix().col(oneAxisIndex);
-    Eigen::Vector3f axisTwo = body1->q.toRotationMatrix().col(twoAxisIndex);
-    Eigen::Vector3f toSt = ptOnEdgeOne - ptOnEdgeTwo;
 
-    float dpStaOne = axisOne.dot(toSt);
-    float dpStaTwo = axisTwo.dot(toSt);
-
-    float smOne = axisOne.squaredNorm();
-    float smTwo = axisTwo.squaredNorm();
-
-    double dotProductEdges = axisTwo.dot(axisOne);
-    double denom = smOne * smTwo - dotProductEdges * dotProductEdges;
-    double ta = (dotProductEdges * dpStaTwo - smTwo * dpStaOne) / denom;
-    double tb = (smOne * dpStaTwo - dotProductEdges * dpStaOne) / denom;
-
-    Eigen::Vector3f ptOne = ptOnEdgeOne + ta * axisOne;
-    Eigen::Vector3f ptTwo = ptOnEdgeTwo + tb * axisTwo;
-
-    m_contacts.push_back(new Contact(body0, body1, 0.5f * (ptOne + ptTwo), axis, penetration));
+    s_contactNormal.normalized();
+    Eigen::Vector3f direction= obb1->x - obb0->x;
+    float diff = direction.dot(s_contactNormal);
+    if (diff > 0.0f)
+        s_contactNormal = -s_contactNormal;
+    for(int i = 0; i < numPts; i++)
+    {
+        Eigen::Vector3f p = pts[i];
+        float phi = -(p - obb0->x).dot(s_contactNormal);
+        m_contacts.push_back( new Contact(obb0, obb1, p, s_contactNormal, phi) );
+    }
 }
+
+Eigen::Vector3f CollisionDetect::GetPointFromIndex(RigidBody *obb, int index) {
+    Box* box = dynamic_cast<Box*>(obb->geometry.get());
+    Eigen::Vector3f point = obb->x;
+    if (index & 4)
+        point += 0.5f * box->dim(2) * obb->q.toRotationMatrix().col(2);
+    else
+        point -= 0.5f * box->dim(2) * obb->q.toRotationMatrix().col(2);
+    if (index & 2)
+        point += 0.5f * box->dim(1) * obb->q.toRotationMatrix().col(1);
+    else
+        point -= 0.5f * box->dim(1) * obb->q.toRotationMatrix().col(1);
+    if (index & 1)
+        point += 0.5f * box->dim(0) * obb->q.toRotationMatrix().col(0);
+    else
+        point -= 0.5f * box->dim(0) * obb->q.toRotationMatrix().col(0);
+    return point;
+}
+
+void CollisionDetect::segmentSegment(const std::vector<Eigen::Vector3f>& segment0,
+                                     const std::vector<Eigen::Vector3f>& segment1, int &numPts,
+                                     Eigen::Vector3f *pts) {
+    Eigen::Vector3f dir0 = segment0[1] - segment0[0];
+    Eigen::Vector3f dir1 = segment1[1] - segment1[0];
+    Eigen::Vector3f normal = dir0.cross(dir1);
+
+    float sqrLenU = dir0.dot(dir0);
+    float sqrLenV = dir1.dot(dir1);
+    float sqrLenN = normal.dot(normal);
+
+    if (sqrLenN < std::numeric_limits<float>::epsilon())
+    {
+        numPts = 2;
+        pts[0] = segment0[0];
+        pts[1] = segment0[1];
+
+        // point 0
+        Eigen::Vector3f V = segment1[0] - segment0[0];
+        float c = V.dot(segment1[0]);
+        clipConvexPolygonAgainstPlane(V, c, numPts, pts);
+
+        // point 1
+        V = -V;
+        c = V.dot(segment1[1]);
+        clipConvexPolygonAgainstPlane(V, c, numPts, pts);
+    }else
+        segmentThroughPlane(segment1, segment0[0], normal.cross(segment0[1] - segment0[0]), numPts, pts);
+}
+
+void CollisionDetect::coplanarRectangleRectangle(std::vector<Eigen::Vector3f> rectangle0,
+                                                 std::vector<Eigen::Vector3f> rectangle1, int &numPts,
+                                                 Eigen::Vector3f *pts) {
+    numPts = 4;
+    for (int i = 0; i < 4; ++i)
+        pts[i] = rectangle0[i];
+    for (int i0 = 3, i1 = 0; i1 < 4; i0 = i1++) {
+        Eigen::Vector3f normal = rectangle1[i1] - rectangle1[i0];
+        float constant = normal.dot(rectangle1[i0]);
+        clipConvexPolygonAgainstPlane(normal, constant, numPts, pts);
+    }
+}
+
+void CollisionDetect::coplanarSegmentRectangle(const std::vector<Eigen::Vector3f> &segment,
+                                               const std::vector<Eigen::Vector3f> &rectangle, int &numPts,
+                                               Eigen::Vector3f *pts) {
+    numPts = 2;
+    for (int i = 0; i < 2; ++i)
+        pts[i] = segment[i];
+
+    for (int i0 = 3, i1 = 0; i1 < 4; i0 = i1++) {
+        Eigen::Vector3f normal = rectangle[i1] - rectangle[i0];
+        float constant = normal.dot(rectangle[i0]);
+        clipConvexPolygonAgainstPlane(normal, constant, numPts, pts);
+    }
+}
+
+void CollisionDetect::clipConvexPolygonAgainstPlane(const Eigen::Vector3f &normal, float constant, int &numPts,
+                                                    Eigen::Vector3f *pts) {
+    int positive = 0, negative = 0, pIndex = -1;
+    int currCount = numPts;
+
+    float test[8];
+    int i;
+    for (i = 0; i < numPts; ++i)
+    {
+        test[i] = normal.dot(pts[i]) - constant +
+                  abs(constant) * std::numeric_limits<float>::epsilon();
+
+        if (test[i] >= 0.0) {
+            ++positive;
+            if (pIndex < 0) {
+                pIndex = i;
+            }
+        } else {
+            ++negative;
+        }
+    }
+    if (numPts == 2) {
+        // Lines are a little different, in that clipping the segment
+        // cannot create a new segment, as clipping a polygon would
+        if (positive > 0) {
+            if (negative > 0) {
+                int clip;
+
+                if (pIndex == 0) {
+                    // vertex0 positive, vertex1 is clipped
+                    clip = 1;
+                } else // pIndex == 1
+                {
+                    // vertex1 positive, vertex0 clipped
+                    clip = 0;
+                }
+
+                float t  = test[pIndex] / (test[pIndex] - test[clip]);
+                pts[clip].x() = pts[pIndex].x() + t * (pts[clip] - pts[pIndex]).x();
+            }
+            // otherwise both positive, no clipping
+        } else {
+            // Assert:  The entire line is clipped, but we should not
+            // get here.
+            numPts = 0;
+        }
+    }else {
+        if (positive > 0) {
+            if (negative > 0) {
+                // plane transversely intersects polygon
+                Eigen::Vector3f CV[8];
+                int cCount = 0, cur, prv;
+                float t;
+
+                if (pIndex > 0) {
+                    // first clip vertex on line
+                    cur          = pIndex;
+                    prv          = cur - 1;
+                    t            = test[cur] / (test[cur] - test[prv]);
+                    CV[cCount++] = pts[cur] + t * (pts[prv] - pts[cur]);
+
+                    // vertices on positive side of line
+                    while (cur < currCount && test[cur] >= 0.0) {
+                        CV[cCount++] = pts[cur++];
+                    }
+
+                    // last clip vertex on line
+                    if (cur < currCount) {
+                        prv = cur - 1;
+                    } else {
+                        cur = 0;
+                        prv = currCount - 1;
+                    }
+                    t            = test[cur] / (test[cur] - test[prv]);
+                    CV[cCount++] = pts[cur] + t * (pts[prv] - pts[cur]);
+                } else // pIndex is 0
+                {
+                    // vertices on positive side of line
+                    cur = 0;
+                    while (cur < currCount && test[cur] >= 0.0) {
+                        CV[cCount++] = pts[cur++];
+                    }
+
+                    // last clip vertex on line
+                    prv          = cur - 1;
+                    t            = test[cur] / (test[cur] - test[prv]);
+                    CV[cCount++] = pts[cur] + t * (pts[prv] - pts[cur]);
+
+                    // skip vertices on negative side
+                    while (cur < currCount && test[cur] < 0.0) {
+                        cur++;
+                    }
+
+                    // first clip vertex on line
+                    if (cur < currCount) {
+                        prv          = cur - 1;
+                        t            = test[cur] / (test[cur] - test[prv]);
+                        CV[cCount++] = pts[cur] + t * (pts[prv] - pts[cur]);
+
+                        // vertices on positive side of line
+                        while (cur < currCount && test[cur] >= 0.0) {
+                            CV[cCount++] = pts[cur++];
+                        }
+                    } else {
+                        // cur = 0
+                        prv          = currCount - 1;
+                        t            = test[0] / (test[0] - test[prv]);
+                        CV[cCount++] = pts[0] + t * (pts[prv] - pts[0]);
+                    }
+                }
+
+                currCount = cCount;
+                std::memcpy(pts, CV, cCount * sizeof(Eigen::Vector3f));
+            }
+            // else polygon fully on positive side of plane, nothing to do
+
+            numPts = currCount;
+        } else {
+            // Polygon does not intersect positive side of plane, clip all.
+            // This should not ever happen if called by the findintersect
+            // routines after an intersection has been determined.
+            numPts = 0;
+        }
+    }
+}
+
+void
+CollisionDetect::segmentThroughPlane(const std::vector<Eigen::Vector3f> &segment, const Eigen::Vector3f &planeOrigin,
+                                     const Eigen::Vector3f &planeNormal, int &numPts, Eigen::Vector3f *pts) {
+    numPts     = 1;
+
+    float u     = planeNormal.dot(planeOrigin);
+    float v0    = planeNormal.dot(segment[0]);
+    float v1    = planeNormal.dot(segment[1]);
+
+    // Now that there it has been reduced to a 1-dimensional problem via
+    // projection, it becomes easy to find the ratio along V that V
+    // intersects with U.
+    float ratio = (u - v0) / (v1 - v0);
+    pts[0]     = segment[0] + ratio * (segment[1] - segment[0]);
+}
+
+
 
 
 

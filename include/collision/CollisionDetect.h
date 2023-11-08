@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <vector>
+#include "IntersectionConfig.h"
 
 class Contact;
 class RigidBody;
@@ -56,18 +57,20 @@ public:
 
     static std::vector<Eigen::Vector3f> getFaceNormal(RigidBody* body, std::vector<Eigen::Vector3f> corners);
     static std::vector<Eigen::Vector3f> getEdgeNormal(RigidBody* body1, RigidBody* body2, std::vector<Eigen::Vector3f> corners1, std::vector<Eigen::Vector3f> corners2);
-
     static std::vector<Eigen::Vector3f> getCorners(RigidBody* body);
 
-    static int testSAT(float minOverlap, std::vector<Eigen::Vector3f> normals, RigidBody* body1, RigidBody* body2, const std::vector<Eigen::Vector3f>& corners1, const std::vector<Eigen::Vector3f>& corners2);
-    static float transformToAxis(RigidBody *pBody, const Eigen::Vector3f& axis, const std::vector<Eigen::Vector3f>& corners);
-
-    void collisionDetectFaceVertex(RigidBody* body0, RigidBody* body1, Eigen::Vector3f axis, float penetration);
-    void collisionDetectEdgeEdge(RigidBody* body0, RigidBody* body1, Eigen::Vector3f axis, float penetration, int oneAxisIndex, int twoAxisIndex);
-
+    static bool FindintersectionOnAxis(RigidBody* obb0, RigidBody* obb1, Eigen::Vector3f &axis, Eigen::Vector3f &relVelocity, float &tfirst, float &tlast, int &side, intersectConfig &box0Cfg,  intersectConfig &box1Cfg);
+    void FindContactSet(RigidBody* obb0, RigidBody* obb1, int side, intersectConfig &box0Cfg, intersectConfig &box1Cfg, float tfirst);
+    static Eigen::Vector3f GetPointFromIndex(RigidBody* body, int index);
+    void segmentSegment(const std::vector<Eigen::Vector3f>& segment0, const std::vector<Eigen::Vector3f>& segment1, int &numPts, Eigen::Vector3f *pts);
+    static void coplanarSegmentRectangle(const std::vector<Eigen::Vector3f>& segment, const std::vector<Eigen::Vector3f>& rectangle, int &numPts, Eigen::Vector3f *pts);
+    static void coplanarRectangleRectangle(std::vector<Eigen::Vector3f> rectangle0, std::vector<Eigen::Vector3f> rectangle1, int &numPts, Eigen::Vector3f *pts);
+    static void clipConvexPolygonAgainstPlane(const Eigen::Vector3f& normal, float constant, int &numPts, Eigen::Vector3f *pts);
+    void segmentThroughPlane(const std::vector<Eigen::Vector3f>& segment, const Eigen::Vector3f& planeOrigin, const Eigen::Vector3f& planeNormal, int &numPts, Eigen::Vector3f *pts);
 private:
 
     RigidBodySystem* m_rigidBodySystem;     // Rigid body system where collision detection is performed.
     std::vector<Contact*> m_contacts;       // Contact array.
-
+    static float s_contactTime;
+    static Eigen::Vector3f s_contactNormal;
 };

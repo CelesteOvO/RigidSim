@@ -107,7 +107,7 @@ public:
         // Create a sphere.
         RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
         body1->x.y() = 4.0f;
-        body1->q = Eigen::AngleAxisf(90, Eigen::Vector3f(1, 0, 0));
+        body1->q = Eigen::AngleAxisf(135, Eigen::Vector3f(1, 0, 0));
         body1->mesh->setTransparency(0.5f);
 
         /*RigidBody* body2 = new RigidBody(1.0f, new Sphere(0.5f), "D:\\project\\rigidBodyTutorial\\resources\\box.obj");
@@ -136,11 +136,12 @@ public:
         body0->fixed = true;
 
         RigidBody* body1 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
-        body1->x = Eigen::Vector3f(0.0f, 0.49f, 0.0f);
+        body1->x = Eigen::Vector3f(0.0f, 2.0f, 0.0f);
+        body1->q = Eigen::AngleAxisf(90, Eigen::Vector3f(1, 0, 0));
 
         RigidBody* body2 = new RigidBody(10.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
-        body2->x = Eigen::Vector3f(2.0f, 0.49f, 0.0f);
-        body2->xdot = Eigen::Vector3f(0.0f, 0.0f, 10.0f);
+        body2->x = Eigen::Vector3f(2.0f, 2.0f, 0.0f);
+        //body2->xdot = Eigen::Vector3f(0.0f, 0.0f, 10.0f);
 
         rigidBodySystem.addBody(body0);
         rigidBodySystem.addBody(body1);
@@ -207,7 +208,7 @@ public:
         body1->x = Eigen::Vector3f(0.0f, 1.5f, 0.0f);
         body1->q = Eigen::AngleAxisf(45, Eigen::Vector3f(0, 1, 0));
         RigidBody* body2 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
-        body2->x = Eigen::Vector3f(0.0f, 2.5f, 0.0f);
+        body2->x = Eigen::Vector3f(0.0f, 3.0f, 0.0f);
         body2->q = Eigen::AngleAxisf(90, Eigen::Vector3f(0, 1, 0));
        /* RigidBody* body3 = new RigidBody(1.0f, new Box(Eigen::Vector3f(1.0f, 1.0f, 1.0f)), "D:\\project\\RigidSim\\resources\\box.obj");
         body3->x = Eigen::Vector3f(0.0f, 3.5f, 0.0f);

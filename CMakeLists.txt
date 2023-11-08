@@ -34,9 +34,11 @@ set(discregrid_HEADERS 3rdParty/Discregrid/include/Discregrid/acceleration/bound
 		3rdParty/Discregrid/src/utility/timing.hpp )
 
 set(collision_HEADERS include/collision/CollisionDetect.h 
-                      include/collision/Geometry.h )
+                      include/collision/Geometry.h
+		include/collision/IntersectionConfig.h)
 set(collision_SOURCE include/collision/CollisionDetect.cpp
-		include/collision/Geometry.cpp)
+		include/collision/Geometry.cpp
+		include/collision/IntersectionConfig.cpp)
 
 set(rigidbody_HEADERS include/rigidbody/RigidBody.h
                       include/rigidbody/RigidBodySystem.h 
