@@ -412,10 +412,10 @@ CollisionDetect::getEdgeNormal(RigidBody *body1, RigidBody *body2, std::vector<E
 bool CollisionDetect::FindintersectionOnAxis(RigidBody *obb0, RigidBody *obb1, Eigen::Vector3f &axis,
                                              Eigen::Vector3f &relVelocity, float &tfirst, float &tlast, int &side, intersectConfig &box0Cfg,
                                              intersectConfig &box1Cfg) {
-    intersectConfig box0CfgStart;
+    intersectConfig box0CfgStart{};
     box0CfgStart.setConfiguration(axis, obb0);
 
-    intersectConfig box1CfgStart;
+    intersectConfig box1CfgStart{};
     box1CfgStart.setConfiguration(axis, obb1);
 
     float t;
@@ -509,8 +509,8 @@ void CollisionDetect::FindContactSet(RigidBody *obb0, RigidBody *obb1, int side,
     box0Final->x = obb0->x + tfirst * obb0->xdot;
     box1Final->x = obb1->x + tfirst * obb1->xdot;
 
-    int *b0Index = box0Cfg.m_index;
-    int *b1Index = box1Cfg.m_index;
+    const int *b0Index = box0Cfg.m_index;
+    const int *b1Index = box1Cfg.m_index;
 
     std::cout << "b0: ";
     for (int i = 0; i < 8; i++) {
@@ -676,17 +676,17 @@ Eigen::Vector3f CollisionDetect::GetPointFromIndex(RigidBody *obb, int index) {
     Box* box = dynamic_cast<Box*>(obb->geometry.get());
     Eigen::Vector3f point = obb->x;
     if (index & 4)
-        point += 0.5f * box->dim(2) * obb->q.toRotationMatrix().col(2);
+        point += box->halfDim(2) * obb->q.toRotationMatrix().col(2);
     else
-        point -= 0.5f * box->dim(2) * obb->q.toRotationMatrix().col(2);
+        point -= box->halfDim(2) * obb->q.toRotationMatrix().col(2);
     if (index & 2)
-        point += 0.5f * box->dim(1) * obb->q.toRotationMatrix().col(1);
+        point += box->halfDim(1) * obb->q.toRotationMatrix().col(1);
     else
-        point -= 0.5f * box->dim(1) * obb->q.toRotationMatrix().col(1);
+        point -= box->halfDim(1) * obb->q.toRotationMatrix().col(1);
     if (index & 1)
-        point += 0.5f * box->dim(0) * obb->q.toRotationMatrix().col(0);
+        point += box->halfDim(0) * obb->q.toRotationMatrix().col(0);
     else
-        point -= 0.5f * box->dim(0) * obb->q.toRotationMatrix().col(0);
+        point -= box->halfDim(0) * obb->q.toRotationMatrix().col(0);
     return point;
 }
 
@@ -1001,17 +1001,18 @@ bool CollisionDetect::DynamicCheck(RigidBody *obb0, RigidBody *obb1, float tmax)
     const float cutoff                  = 1.0f - std::numeric_limits<float>::epsilon();
     bool existsParallelPair           = false;
 
-    box0->m_axes[0] = obb0->q.toRotationMatrix() * Eigen::Vector3f(1,0,0);
-    box0->m_axes[1] = obb0->q.toRotationMatrix() * Eigen::Vector3f(0,1,0);
-    box0->m_axes[2] = obb0->q.toRotationMatrix() * Eigen::Vector3f(0,0,1);
+    Eigen::Vector3f m_axes1[3],m_axes2[3];
+    m_axes1[0] = obb0->q.toRotationMatrix() * Eigen::Vector3f(1,0,0);
+    m_axes1[1] = obb0->q.toRotationMatrix() * Eigen::Vector3f(0,1,0);
+    m_axes1[2] = obb0->q.toRotationMatrix() * Eigen::Vector3f(0,0,1);
 
-    box1->m_axes[0] = obb1->q.toRotationMatrix() * Eigen::Vector3f(1,0,0);
-    box1->m_axes[1] = obb1->q.toRotationMatrix() * Eigen::Vector3f(0,1,0);
-    box1->m_axes[2] = obb1->q.toRotationMatrix() * Eigen::Vector3f(0,0,1);
+    m_axes2[0] = obb1->q.toRotationMatrix() * Eigen::Vector3f(1,0,0);
+    m_axes2[1] = obb1->q.toRotationMatrix() * Eigen::Vector3f(0,1,0);
+    m_axes2[2] = obb1->q.toRotationMatrix() * Eigen::Vector3f(0,0,1);
 
     // convenience variables
-    const Eigen::Vector3f *A = box0->m_axes;
-    const Eigen::Vector3f *B = box1->m_axes;
+    const Eigen::Vector3f *A = m_axes1;
+    const Eigen::Vector3f *B = m_axes2;
     const Eigen::Vector3f EA = box0->halfDim;
     const Eigen::Vector3f EB = box1->halfDim;
     Eigen::Vector3f D        = obb1->x - obb0->x;

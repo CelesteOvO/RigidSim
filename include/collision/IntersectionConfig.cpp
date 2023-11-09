@@ -15,7 +15,7 @@ void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *o
         if(absAxes[1] < std::numeric_limits<float>::epsilon())
         {
             m_map              = m44;
-            maxProjectedExtent = absAxes[2] * box->dim(2);
+            maxProjectedExtent = absAxes[2] * box->dim(2) * 0.5f;
             
             // faces have normals along axis[2]
             if (axes[2] > 0.0f)
@@ -45,7 +45,7 @@ void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *o
         }else if(absAxes[2] < std::numeric_limits<float>::epsilon()) {
             // face-face
             m_map = m44;
-            maxProjectedExtent = absAxes[1] * box->dim(1);
+            maxProjectedExtent = absAxes[1] * box->dim(1) * 0.5f;
 
             // faces have normals along axis[1]
             if (axes[1] > 0.0f) {
@@ -74,7 +74,7 @@ void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *o
             // seg-seg
             m_map              = m2_2;
 
-            maxProjectedExtent = absAxes[1] * box->dim(1) + absAxes[2] * box->dim(2);
+            maxProjectedExtent = absAxes[1] * box->dim(1) * 0.5f + absAxes[2] * box->dim(2) * 0.5f;
 
             // axis 0 is perpendicular to axis
             if (axes[1] > 0.0f) {
@@ -113,7 +113,7 @@ void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *o
             // face-face
             m_map              = m44;
 
-            maxProjectedExtent = absAxes[0] * box->dim(0);
+            maxProjectedExtent = absAxes[0] * box->dim(0) * 0.5f;
 
             // faces have normals along axis[0]
             if (axes[0] > 0.0f) {
@@ -143,7 +143,7 @@ void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *o
             // seg-seg
             m_map              = m2_2;
 
-            maxProjectedExtent = absAxes[0] * box->dim(0) + absAxes[2] * box->dim(2);
+            maxProjectedExtent = absAxes[0] * box->dim(0) * 0.5f + absAxes[2] * box->dim(2) * 0.5f;
 
             // axis 1 is perpendicular to axis
             if (axes[0] > 0.0f) {
@@ -182,7 +182,7 @@ void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *o
         // seg-seg
         m_map              = m2_2;
 
-        maxProjectedExtent = absAxes[0] * box->dim(0) + absAxes[1] * box->dim(1);
+        maxProjectedExtent = absAxes[0] * box->dim(0) * 0.5f + absAxes[1] * box->dim(1) * 0.5f;
 
         // axis 2 is perpendicular to axis
         if (axes[0] > 0.0f) {
@@ -221,8 +221,8 @@ void intersectConfig::setConfiguration(const Eigen::Vector3f &axis, RigidBody *o
         // point-point (unique maximal and minimal vertex)
         m_map              = m1_1;
 
-        maxProjectedExtent = absAxes[0] * box->dim(0) + absAxes[1] * box->dim(1) +
-                             absAxes[2] * box->dim(2);
+        maxProjectedExtent = absAxes[0] * box->dim(0) * 0.5f + absAxes[1] * box->dim(1) * 0.5f +
+                             absAxes[2] * box->dim(2) * 0.5f;
 
         // only these two vertices matter, the rest are irrelevant
         m_index[0] = (axes[0] > 0.0f ? 0 : 1) +
