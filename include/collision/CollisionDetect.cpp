@@ -243,11 +243,24 @@ void CollisionDetect::collisionDetectSpherePlane(RigidBody *body0, RigidBody *bo
 
 ///TODO: 有问题
 void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) {
+    float stepsize = 0.0167f; // m_dt / m_numSteps
+
+    if (DynamicCheck(body0, body1, stepsize))
+    {
+        DeriveContacts(body0, body1);
+    }
+}
+
+
+bool CollisionDetect::DeriveContacts(RigidBody *body0, RigidBody *body1) {
+
+    Box* box0 = dynamic_cast<Box*>(body0->geometry.get());
+    Box* box1 = dynamic_cast<Box*>(body1->geometry.get());
 
     s_contactTime = 0.0f;
     float tlast = std::numeric_limits<float>::max();
 
-    Eigen::Vector3f relVelocity = body0->xdot - body1->xdot;
+    Eigen::Vector3f relVelocity = (body0->xdot - body1->xdot) * 0.0167f;
 
     int side = intersectConfig::NONE;
     intersectConfig box0Cfg, box1Cfg;
@@ -265,17 +278,17 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
     {
         Eigen::Vector3f axis = faceNormals1[i];
         if(!FindintersectionOnAxis(body0, body1, axis, relVelocity,  s_contactTime, tlast,side, box0Cfg, box1Cfg))
-            return;
+            return false;
     }
 
     for(int i = 0; i < 3; i++)
     {
         Eigen::Vector3f axis = faceNormals2[i];
         if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
-            return;
+            return false;
     }
 
-   /* std::vector<Eigen::Vector3f> edgeNormals;
+    /*std::vector<Eigen::Vector3f> edgeNormals;
     edgeNormals = getEdgeNormal(body0, body1, corners1, corners2);*/
 
     for(int i = 0; i < 3; i++)
@@ -283,13 +296,13 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
         for(int j = 0; j < 3; ++j)
         {
             Eigen::Vector3f axis = faceNormals1[i].cross(faceNormals2[j]);
-            if (axis.dot(axis) <= std::numeric_limits<float>::epsilon())// skip almost parallel edges
+            if (abs(axis.dot(axis)) <= std::numeric_limits<float>::epsilon())// skip almost parallel edges
             {
                 FindContactSet(body0, body1, side, box0Cfg, box1Cfg, s_contactTime);
-                return;
+                return true;
             }
             if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
-                return;
+                return false;
         }
     }
 
@@ -298,7 +311,7 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
     {
         Eigen::Vector3f axis = faceNormals1[i].cross(relVelocity);
         if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
-            return;
+            return false;
     }
 
     // velocity cross box 1 edges
@@ -306,13 +319,14 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
     {
         Eigen::Vector3f axis = faceNormals2[i].cross(relVelocity);
         if(!FindintersectionOnAxis(body0, body1, axis, relVelocity, s_contactTime, tlast,side, box0Cfg, box1Cfg))
-            return;
+            return false;
     }
 
     if (s_contactTime <= 0.0f || side == intersectConfig::NONE)
-        return;
+        return false;
 
     FindContactSet(body0, body1, side, box0Cfg, box1Cfg, s_contactTime);
+    return true;
 }
 
 std::vector<Eigen::Vector3f> CollisionDetect::getCorners(RigidBody *body) {
@@ -360,13 +374,13 @@ std::vector<Eigen::Vector3f> CollisionDetect::getFaceNormal(RigidBody *body, std
 
     std::vector<Eigen::Vector3f> normals;
     Eigen::Vector3f N = body->q.toRotationMatrix() * Eigen::Vector3f(1, 0, 0);
-    normals.push_back(N);
+    normals.push_back(N.normalized());
 
     N = body->q.toRotationMatrix() * Eigen::Vector3f(0, 1, 0);
-    normals.push_back(N);
+    normals.push_back(N.normalized());
 
     N = body->q.toRotationMatrix() * Eigen::Vector3f(0, 0, 1);
-    normals.push_back(N);
+    normals.push_back(N.normalized());
 
     return normals;
 }
@@ -875,7 +889,7 @@ CollisionDetect::segmentThroughPlane(const std::vector<Eigen::Vector3f> &segment
     pts[0]     = segment[0] + ratio * (segment[1] - segment[0]);
 }
 
-void
+bool
 CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, float speed, float tmax, float &tlast) {
     s_minAxisPenetrationDepth = std::numeric_limits<float>::max();
     float invSpeed, t;
@@ -883,7 +897,7 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
     {
         if (speed <= 0.0f)
             // The projection intervals are moving apart.
-            return;
+            return true;
 
         invSpeed = 1.0f / speed;
 
@@ -894,7 +908,7 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
 
         if (s_contactTime > tmax)
             // intervals do not intersect during the specified time.
-            return;
+            return true;
 
         t = (max0 - min1) * invSpeed;
 
@@ -903,7 +917,7 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
 
         if (s_contactTime > tlast)
             // Physically inconsistent times--the objects cannot intersect.
-            return;
+            return true;
 
         float currPenetration = max1 - min0;
         if (currPenetration < s_minAxisPenetrationDepth)
@@ -912,7 +926,7 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
     {
         if (speed >= 0.0f)
             // The projection intervals are moving apart.
-            return;
+            return true;
 
         invSpeed = 1.0f / speed;
 
@@ -923,7 +937,7 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
 
         if (s_contactTime > tmax)
             // intervals do not intersect during the specified time.
-            return;
+            return true;
 
         t = (min0 - max1) * invSpeed;
 
@@ -932,7 +946,7 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
 
         if (s_contactTime > tlast)
             // Physically inconsistent times--the objects cannot intersect.
-            return;
+            return true;
 
         float currPenetration = max0 - min1;
         if (currPenetration < s_minAxisPenetrationDepth)
@@ -947,7 +961,7 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
 
             if (s_contactTime > tlast)
                 // Physically inconsistent times--the objects cannot intersect.
-                return;
+                return true;
 
             float currPenetration = max1 - min0;
             if (currPenetration < s_minAxisPenetrationDepth)
@@ -960,14 +974,207 @@ CollisionDetect::IsSeparated(float min0, float max0, float min1, float max1, flo
 
             if (s_contactTime > tlast)
                 // Physically inconsistent times--the objects cannot intersect.
-                return;
+                return true;
 
             float currPenetration = max0 - min1;
             if (currPenetration < s_minAxisPenetrationDepth)
                 s_minAxisPenetrationDepth = currPenetration;
         }
     }
+    return false;
 }
+
+bool CollisionDetect::DynamicCheck(RigidBody *obb0, RigidBody *obb1, float tmax) {
+
+    Box* box0 = dynamic_cast<Box*>(obb0->geometry.get());
+    Box* box1 = dynamic_cast<Box*>(obb1->geometry.get());
+
+    Eigen::Vector3f velocity0 = obb0->xdot * 0.0167f;
+    Eigen::Vector3f velocity1 = obb1->xdot * 0.0167f;
+    
+    if (velocity0 == velocity1) {
+        s_contactTime = 0.0f;
+        //return StaticCheck(obb0, obb1);
+        return false;
+    }
+
+    const float cutoff                  = 1.0f - std::numeric_limits<float>::epsilon();
+    bool existsParallelPair           = false;
+
+    box0->m_axes[0] = obb0->q.toRotationMatrix() * Eigen::Vector3f(1,0,0);
+    box0->m_axes[1] = obb0->q.toRotationMatrix() * Eigen::Vector3f(0,1,0);
+    box0->m_axes[2] = obb0->q.toRotationMatrix() * Eigen::Vector3f(0,0,1);
+
+    box1->m_axes[0] = obb1->q.toRotationMatrix() * Eigen::Vector3f(1,0,0);
+    box1->m_axes[1] = obb1->q.toRotationMatrix() * Eigen::Vector3f(0,1,0);
+    box1->m_axes[2] = obb1->q.toRotationMatrix() * Eigen::Vector3f(0,0,1);
+
+    // convenience variables
+    const Eigen::Vector3f *A = box0->m_axes;
+    const Eigen::Vector3f *B = box1->m_axes;
+    const Eigen::Vector3f EA = box0->halfDim;
+    const Eigen::Vector3f EB = box1->halfDim;
+    Eigen::Vector3f D        = obb1->x - obb0->x;
+    Eigen::Vector3f W        = velocity1 - velocity0;
+    float C[3][3];    // matrix C = A^T B, c_{ij} = Dot(A_i,B_j)
+    float AbsC[3][3]; // |c_{ij}|
+    float AD[3];      // Dot(A_i,D)
+    float AW[3];      // Dot(A_i,W)
+    float min0, max0, min1, max1, center, radius, speed;
+    unsigned i, j;
+
+    float tlast = std::numeric_limits<float>::max();
+
+    // axes C0+t*A[i]
+    for (i = 0; i < 3; ++i) {
+        for (j = 0; j < 3; ++j) {
+            C[i][j]    = A[i].dot(B[j]);
+            AbsC[i][j] = abs(C[i][j]);
+            if (AbsC[i][j] > cutoff)
+                existsParallelPair = true;
+        }
+        AD[i]  = A[i].dot(D);
+        AW[i]  = A[i].dot(W);
+        min0   = -EA[i];
+        max0   = +EA[i];
+        radius = EB[0] * AbsC[i][0] + EB[1] * AbsC[i][1] + EB[2] * AbsC[i][2];
+        min1   = AD[i] - radius;
+        max1   = AD[i] + radius;
+        speed  = AW[i];
+        if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+            return false;
+    }
+
+    // axes C0+t*B[i]
+    for (i = 0; i < 3; ++i) {
+        radius = EA[0] * AbsC[0][i] + EA[1] * AbsC[1][i] + EA[2] * AbsC[2][i];
+        min0   = -radius;
+        max0   = +radius;
+        center = B[i].dot(D);
+        min1   = center - EB[i];
+        max1   = center + EB[i];
+        speed  = W.dot(B[i]);
+        if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+            return false;
+    }
+
+    // At least one pair of box axes was parallel, so the separation is
+    // effectively in 2D where checking the "edge" normals is sufficient for
+    // the separation of the boxes.
+    if (existsParallelPair)
+        return true;
+
+    // axis C0+t*A0xB0
+    radius = EA[1] * AbsC[2][0] + EA[2] * AbsC[1][0];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[2] * C[1][0] - AD[1] * C[2][0];
+    radius = EB[1] * AbsC[0][2] + EB[2] * AbsC[0][1];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[2] * C[1][0] - AW[1] * C[2][0];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A0xB1
+    radius = EA[1] * AbsC[2][1] + EA[2] * AbsC[1][1];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[2] * C[1][1] - AD[1] * C[2][1];
+    radius = EB[0] * AbsC[0][2] + EB[2] * AbsC[0][0];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[2] * C[1][1] - AW[1] * C[2][1];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A0xB2
+    radius = EA[1] * AbsC[2][2] + EA[2] * AbsC[1][2];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[2] * C[1][2] - AD[1] * C[2][2];
+    radius = EB[0] * AbsC[0][1] + EB[1] * AbsC[0][0];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[2] * C[1][2] - AW[1] * C[2][2];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A1xB0
+    radius = EA[0] * AbsC[2][0] + EA[2] * AbsC[0][0];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[0] * C[2][0] - AD[2] * C[0][0];
+    radius = EB[1] * AbsC[1][2] + EB[2] * AbsC[1][1];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[0] * C[2][0] - AW[2] * C[0][0];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A1xB1
+    radius = EA[0] * AbsC[2][1] + EA[2] * AbsC[0][1];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[0] * C[2][1] - AD[2] * C[0][1];
+    radius = EB[0] * AbsC[1][2] + EB[2] * AbsC[1][0];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[0] * C[2][1] - AW[2] * C[0][1];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A1xB2
+    radius = EA[0] * AbsC[2][2] + EA[2] * AbsC[0][2];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[0] * C[2][2] - AD[2] * C[0][2];
+    radius = EB[0] * AbsC[1][1] + EB[1] * AbsC[1][0];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[0] * C[2][2] - AW[2] * C[0][2];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A2xB0
+    radius = EA[0] * AbsC[1][0] + EA[1] * AbsC[0][0];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[1] * C[0][0] - AD[0] * C[1][0];
+    radius = EB[1] * AbsC[2][2] + EB[2] * AbsC[2][1];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[1] * C[0][0] - AW[0] * C[1][0];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A2xB1
+    radius = EA[0] * AbsC[1][1] + EA[1] * AbsC[0][1];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[1] * C[0][1] - AD[0] * C[1][1];
+    radius = EB[0] * AbsC[2][2] + EB[2] * AbsC[2][0];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[1] * C[0][1] - AW[0] * C[1][1];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    // axis C0+t*A2xB2
+    radius = EA[0] * AbsC[1][2] + EA[1] * AbsC[0][2];
+    min0   = -radius;
+    max0   = +radius;
+    center = AD[1] * C[0][2] - AD[0] * C[1][2];
+    radius = EB[0] * AbsC[2][1] + EB[1] * AbsC[2][0];
+    min1   = center - radius;
+    max1   = center + radius;
+    speed  = AW[1] * C[0][2] - AW[0] * C[1][2];
+    if (IsSeparated(min0, max0, min1, max1, speed, tmax, tlast))
+        return false;
+
+    return true;
+}
+
 
 
 

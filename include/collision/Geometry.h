@@ -51,9 +51,14 @@ class Box : public Geometry
 {
 public:
     Eigen::Vector3f dim;        // Box dimensions.
+    Eigen::Vector3f halfDim;    // Half of the box dimensions.
+    Eigen::Vector3f m_axes[3];
 
     explicit Box(Eigen::Vector3f  _dim) : dim(std::move(_dim)) {
-
+        halfDim = dim / 2.0f;
+        m_axes[0] = Eigen::Vector3f(1,0,0);
+        m_axes[1] = Eigen::Vector3f(0,1,0);
+        m_axes[2] = Eigen::Vector3f(0,0,1);
     }
     ~Box() override = default;
 

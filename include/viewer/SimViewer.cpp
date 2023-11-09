@@ -29,7 +29,7 @@ namespace
         Eigen::Vector3f(-0.71f, 0, -0.71f)
     };
 
-    static void updateRigidBodyMeshes(RigidBodySystem& _rigidBodySystem)
+    void updateRigidBodyMeshes(RigidBodySystem& _rigidBodySystem)
     {
         auto& bodies = _rigidBodySystem.getBodies();
         for(unsigned int i = 0; i < bodies.size(); ++i)
@@ -41,7 +41,7 @@ namespace
         }
     }
 
-    static void updateContactPoints(RigidBodySystem& _rigidBodySystem)
+    void updateContactPoints(RigidBodySystem& _rigidBodySystem)
     {
         const auto& contacts = _rigidBodySystem.getContacts();
         const unsigned int numContacts = contacts.size();
