@@ -52,9 +52,18 @@ class Box : public Geometry
 public:
     Eigen::Vector3f dim;        // Box dimensions.
     Eigen::Vector3f halfDim;    // Half of the box dimensions.
+    Eigen::Vector3f corners[8]; // Box corners.
 
     explicit Box(Eigen::Vector3f  _dim) : dim(std::move(_dim)) {
         halfDim = dim / 2.0f;
+        corners[0] = Eigen::Vector3f(-halfDim[0], -halfDim[1], -halfDim[2]);
+        corners[1] = Eigen::Vector3f(-halfDim[0], -halfDim[1],  halfDim[2]);
+        corners[2] = Eigen::Vector3f(-halfDim[0],  halfDim[1], -halfDim[2]);
+        corners[3] = Eigen::Vector3f(-halfDim[0],  halfDim[1],  halfDim[2]);
+        corners[4] = Eigen::Vector3f( halfDim[0], -halfDim[1], -halfDim[2]);
+        corners[5] = Eigen::Vector3f( halfDim[0], -halfDim[1],  halfDim[2]);
+        corners[6] = Eigen::Vector3f( halfDim[0],  halfDim[1], -halfDim[2]);
+        corners[7] = Eigen::Vector3f( halfDim[0],  halfDim[1],  halfDim[2]);
     }
     ~Box() override = default;
 
