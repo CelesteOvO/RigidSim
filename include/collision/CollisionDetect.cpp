@@ -251,86 +251,6 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
     }
 }
 
-void CollisionDetect::ComputePene(RigidBody *body0, RigidBody *body1) {
-    std::vector<Eigen::Vector3f> corners0 = getCorners(body0);
-    std::vector<Eigen::Vector3f> corners1 = getCorners(body1);
-
-    std::vector<Eigen::Vector3f> aNormals = getNormal(body0, corners0);
-    std::vector<Eigen::Vector3f> bNormals = getNormal(body1, corners1);
-    std::vector<Eigen::Vector3f> edgeNormals = getEdgeNormal(aNormals, bNormals);
-
-    bool isSeparated = false;
-
-    float minAxisPenetrationDepth = std::numeric_limits<float>::max();
-
-    // For each normal
-    for (const auto & aNormal : aNormals)
-    {
-        // Get the Min and Max projections for each object along the normal.
-        float aMin, aMax;
-        GetMinMax(body0, aNormal, aMin, aMax);
-
-        float bMin, bMax;
-        GetMinMax(body1, aNormal, bMin, bMax);
-
-        isSeparated = aMax < bMin || bMax < aMin;
-
-        if(isSeparated)
-            continue;
-        else
-        {
-            float penetrationDepth = std::min(aMax - bMin, bMax - aMin);
-            if (penetrationDepth < minAxisPenetrationDepth)
-                minAxisPenetrationDepth = penetrationDepth;
-        }
-    }
-
-    for (const auto & bNormal : bNormals)
-    {
-        // Get the Min and Max projections for each object along the normal.
-        float aMin, aMax;
-        GetMinMax(body0, bNormal, aMin, aMax);
-
-        float bMin, bMax;
-        GetMinMax(body1, bNormal, bMin, bMax);
-
-        isSeparated = aMax < bMin || bMax < aMin;
-        if (isSeparated)
-            continue;
-        else
-        {
-            float penetrationDepth = std::min(aMax - bMin, bMax - aMin);
-            if (penetrationDepth < minAxisPenetrationDepth)
-                minAxisPenetrationDepth = penetrationDepth;
-        }
-    }
-
-    for (const auto & edgeNormal : edgeNormals)
-    {
-        if(abs(edgeNormal.dot(edgeNormal)) <= std::numeric_limits<float>::epsilon())// skip almost parallel edges
-            continue;
-        // Get the Min and Max projections for each object along the normal.
-        float aMin, aMax;
-        GetMinMax(body0, edgeNormal, aMin, aMax);
-
-        float bMin, bMax;
-        GetMinMax(body1, edgeNormal, bMin, bMax);
-
-        isSeparated = aMax < bMin || bMax < aMin;
-        if (isSeparated)
-            continue;
-        else
-        {
-            float penetrationDepth = std::min(aMax - bMin, bMax - aMin);
-            if (penetrationDepth < minAxisPenetrationDepth)
-                minAxisPenetrationDepth = penetrationDepth;
-        }
-    }
-
-    s_minAxisPenetrationDepth = minAxisPenetrationDepth;
-    float test = s_minAxisPenetrationDepth;
-}
-
 bool CollisionDetect::TestSAT(RigidBody *body0, RigidBody *body1) {
     std::vector<Eigen::Vector3f> corners0 = getCorners(body0);
     std::vector<Eigen::Vector3f> corners1 = getCorners(body1);
@@ -395,7 +315,6 @@ bool CollisionDetect::TestSAT(RigidBody *body0, RigidBody *body1) {
     return isSeparated;
 }
 
-
 std::vector<Eigen::Vector3f> CollisionDetect::getNormal(RigidBody *body, std::vector<Eigen::Vector3f> corners) {
     std::vector<Eigen::Vector3f> normals;
 
@@ -455,11 +374,58 @@ void CollisionDetect::GetMinMax(RigidBody *obj, const Eigen::Vector3f& axis, flo
     }
 }
 
+void CollisionDetect::ComputePene(RigidBody *body0, RigidBody *body1) {
+    std::vector<Eigen::Vector3f> corners0 = getCorners(body0);
+    std::vector<Eigen::Vector3f> corners1 = getCorners(body1);
+
+    std::vector<Eigen::Vector3f> aNormals = getNormal(body0, corners0);
+    std::vector<Eigen::Vector3f> bNormals = getNormal(body1, corners1);
+    std::vector<Eigen::Vector3f> edgeNormals = getEdgeNormal(aNormals, bNormals);
+
+    std::vector<Eigen::Vector3f> allNormals;
+    allNormals.insert(allNormals.end(), aNormals.begin(), aNormals.end());
+    allNormals.insert(allNormals.end(), bNormals.begin(), bNormals.end());
+    allNormals.insert(allNormals.end(), edgeNormals.begin(), edgeNormals.end());
+
+    bool isSeparated = false;
+
+    s_minAxisPenetrationDepth = std::numeric_limits<float>::max();
+
+
+    for (const auto & normal : allNormals)
+    {
+        if(abs(normal.dot(normal)) <= std::numeric_limits<float>::epsilon())// skip almost parallel edges
+            continue;
+        // Get the Min and Max projections for each object along the normal.
+        float aMin, aMax;
+        GetMinMax(body0, normal, aMin, aMax);
+
+        float bMin, bMax;
+        GetMinMax(body1, normal, bMin, bMax);
+
+        isSeparated = aMax < bMin || bMax < aMin;
+        if (isSeparated)
+            continue;
+        else
+        {
+            float penetrationDepth = std::min(aMax - bMin, bMax - aMin);
+            if (penetrationDepth < s_minAxisPenetrationDepth)
+            {
+                s_minAxisPenetrationDepth = penetrationDepth;
+                s_contactNormal = normal;
+            }
+        }
+    }
+
+    /*float test = s_minAxisPenetrationDepth;
+    Eigen::Vector3f test1 = s_contactNormal;*/
+}
+
 void CollisionDetect::DeriveContacts(RigidBody *body0, RigidBody *body1) {
     int side = intersectConfig::NONE;
     intersectConfig box0Cfg{}, box1Cfg{};
 
-    std::vector<Eigen::Vector3f> corners0 = getCorners(body0);
+    /*std::vector<Eigen::Vector3f> corners0 = getCorners(body0);
     std::vector<Eigen::Vector3f> corners1 = getCorners(body1);
 
     std::vector<Eigen::Vector3f> aNormals = getNormal(body0, corners0);
@@ -489,6 +455,9 @@ void CollisionDetect::DeriveContacts(RigidBody *body0, RigidBody *body1) {
     }
 
     if (side == intersectConfig::NONE)
+        return;*/
+
+    if(!FindintersectionOnAxis(body0, body1, s_contactNormal,side, box0Cfg, box1Cfg))
         return;
 
     FindContactSet(body0, body1, side, box0Cfg, box1Cfg);
@@ -508,7 +477,6 @@ bool CollisionDetect::FindintersectionOnAxis(RigidBody *body0, RigidBody *body1,
             return false;
         else
         {
-            s_contactNormal = axis;
             side = intersectConfig::LEFT;
             box0Cfg = box0CfgStart;
             box1Cfg = box1CfgStart;
@@ -520,7 +488,6 @@ bool CollisionDetect::FindintersectionOnAxis(RigidBody *body0, RigidBody *body1,
             return false;
         else
         {
-            s_contactNormal = -axis;
             side = intersectConfig::RIGHT;
             box0Cfg = box0CfgStart;
             box1Cfg = box1CfgStart;
@@ -530,14 +497,12 @@ bool CollisionDetect::FindintersectionOnAxis(RigidBody *body0, RigidBody *body1,
     {
         if (box0CfgStart.m_min < box1CfgStart.m_min)
         {
-            s_contactNormal = -axis;
             side = intersectConfig::RIGHT;
             box0Cfg = box0CfgStart;
             box1Cfg = box1CfgStart;
         }
         else
         {
-            s_contactNormal = axis;
             side = intersectConfig::LEFT;
             box0Cfg = box0CfgStart;
             box1Cfg = box1CfgStart;
@@ -704,7 +669,7 @@ void CollisionDetect::FindContactSet(RigidBody *body0, RigidBody *body1, int sid
     for (int i = 0; i < numPts; ++i)
     {
         //float pene = s_contactNormal.dot(pts[i] - body0->x);
-        m_contacts.push_back( new Contact(body0, body1, pts[i], s_contactNormal, s_minAxisPenetrationDepth) );
+        m_contacts.push_back( new Contact(body0, body1, pts[i], s_contactNormal, s_minAxisPenetrationDepth));
     }
 }
 
