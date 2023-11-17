@@ -55,6 +55,7 @@ private:
 
 public:
     static bool TestSAT(RigidBody* body0, RigidBody* body1);
+    static void ComputePene(RigidBody* body0, RigidBody* body1);
     static std::vector<Eigen::Vector3f> getNormal(RigidBody* body, std::vector<Eigen::Vector3f> corners);
     static std::vector<Eigen::Vector3f> getEdgeNormal(const std::vector<Eigen::Vector3f>& aNormals, const std::vector<Eigen::Vector3f>& bNormals);
     static std::vector<Eigen::Vector3f> getCorners(RigidBody* body);
