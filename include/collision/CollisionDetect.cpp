@@ -246,6 +246,7 @@ void CollisionDetect::collisionDetectBoxBox(RigidBody *body0, RigidBody *body1) 
         //std::cout << "There is a collision between box and box" << std::endl;
 
         ///Generate contacts
+        //Penetration = 0.0f;
         ComputePene(body0, body1);
         DeriveContacts(body0, body1);
     }
@@ -318,8 +319,8 @@ bool CollisionDetect::TestSAT(RigidBody *body0, RigidBody *body1) {
 std::vector<Eigen::Vector3f> CollisionDetect::getNormal(RigidBody *body, std::vector<Eigen::Vector3f> corners) {
     std::vector<Eigen::Vector3f> normals;
 
-    Eigen::Vector3f U = corners[1] - corners[0];
-    Eigen::Vector3f V = corners[2] - corners[0];
+    Eigen::Vector3f U = corners[1] - corners[3];
+    Eigen::Vector3f V = corners[2] - corners[3];
     Eigen::Vector3f N = U.cross(V).normalized();
     normals.push_back(N);
 
@@ -328,8 +329,8 @@ std::vector<Eigen::Vector3f> CollisionDetect::getNormal(RigidBody *body, std::ve
     N = U.cross(V).normalized();
     normals.push_back(N);
 
-    U = corners[2] - corners[0];
-    V = corners[4] - corners[0];
+    U = corners[2] - corners[6];
+    V = corners[4] - corners[6];
     N = U.cross(V).normalized();
     normals.push_back(N);
 
@@ -668,7 +669,8 @@ void CollisionDetect::FindContactSet(RigidBody *body0, RigidBody *body1, int sid
         s_contactNormal = -s_contactNormal;
     for (int i = 0; i < numPts; ++i)
     {
-        //float pene = s_contactNormal.dot(pts[i] - body0->x);
+        //Penetration = s_minAxisPenetrationDepth;
+        //float phi = s_contactNormal.dot(pts[i] - body0->x);
         m_contacts.push_back( new Contact(body0, body1, pts[i], s_contactNormal, s_minAxisPenetrationDepth));
     }
 }
